@@ -37,8 +37,8 @@ Naturally if a player is using the shielded mode, it is unlikely that an unshiel
 - *3 points:* 3 of a kind
 - *4 points:* 3 of a kind + 1 pair
 - *4 points:* 4 of a kind
-- *4 points:* straight
-- *5 points:* 5 of a kind
+- *4 points:* straight (1-5)
+- *5 points:* 5 of 1s 
 
 #### Winning
 
