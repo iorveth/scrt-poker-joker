@@ -1,13 +1,13 @@
 # scrt-poker-joker
 
 Scrt Poker Joker is a multiplayer dice game implemented on the Scrt Network.
-This is inspired by a game in the [Corsairs: Conquest at Sea] game series.
+This is inspired by a game in the [Sea Dogs] game series.
 It is similar, yet more simple than Poker dice.
 
 The players of the game role their own sets of dice, which are represented by Secret NFTs (SNIP-721).
 The owner of the dice NFT, depending on the attributes of the NFT, may have different privilledges.
 
-[Corsairs: Conquest at Sea]: https://en.wikipedia.org/wiki/Corsairs:_Conquest_at_Sea
+[Sea Dogs]: https://www.gamepressure.com/games/sea-dogs-to-each-his-own/ze52a6
 
 ## Poker Joker Rules
 
