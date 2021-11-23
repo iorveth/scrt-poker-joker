@@ -1,7 +1,7 @@
 # scrt-poker-joker
 
 Scrt Poker Joker is a multiplayer dice game implemented on the Scrt Network.
-This is inspired by a game in the [Sea Dogs] game series.
+This is inspired by a mini game in the [Sea Dogs] game series.
 It is similar, yet more simple than Poker dice.
 
 The players of the game role their own sets of dice, which are represented by Secret NFTs (SNIP-721).
