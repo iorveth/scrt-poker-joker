@@ -70,8 +70,14 @@ In order to align the value of the Dice NFT with their utility, we have initiall
 - https://github.com/scrtlabs/SecretJS-Templates
 - https://github.com/baedrik/snip721-reference-impl
 - https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
+- https://build.scrt.network/dev/developing-secret-contracts.html#debug-printing
 
 
 ## DAO-like voting (TBC)
 
 With the Dice NFT, owners can take part in the governance of the game.
+
+
+## Ideas to explore
+- loser loses points
+
