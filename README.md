@@ -74,7 +74,6 @@ In order to align the value of the Dice NFT with their utility, we have initiall
 
 
 ## DAO-like voting (TBC)
-
 With the Dice NFT, owners can take part in the governance of the game.
 
 
