@@ -2,10 +2,14 @@
 
 ## Setup
 
+Pulling and setting the submodule
+
+1. `git submodule update --remote --recursive`
+
 Run the local node:
 
 1. make sure you have `local-node-setup.sh` and `docker/chain-setup.sh` as executables
-2. run `./local-node-setup.sh `
+1. run `./local-node-setup.sh `
 
 This will provide you with Admin and 10 players with chain balance in uscrt
 
