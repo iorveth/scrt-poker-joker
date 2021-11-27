@@ -1,0 +1,4 @@
+[submodule "pj-nft"]
+	path = pj-nft
+	url = https://github.com/whalelephant/snip721-reference-impl
+	branch = pj-nft
