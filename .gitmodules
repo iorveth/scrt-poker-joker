@@ -2,3 +2,7 @@
 	path = pj-nft
 	url = https://github.com/whalelephant/snip721-reference-impl
 	branch = pj-nft
+[submodule "real-dice"]
+	path = real-dice
+	url = https://github.com/Blucbo/real-dice
+	branch = main
