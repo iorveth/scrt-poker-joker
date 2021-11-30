@@ -1,7 +1,7 @@
 #!/bin/bash
 
 docker run -it --rm \
-    -v $(pwd)/docker:/root/docker \
+    -v $(pwd):/root\
     -p 26657:26657 \
     -p 26656:26656 \
     -p 1337:1337 \
