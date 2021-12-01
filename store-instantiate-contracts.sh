@@ -5,12 +5,17 @@ set -o allexport
 source .env.dev
 set -a allexport
 
-docker run --rm -v "$(pwd)":/contract \
+docker run --rm -v "$(pwd)/pj-dao":/contract \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  enigmampc/secret-contract-optimizer
+  enigmampc/secret-contract-optimizer:1.0.5
 
-# docker exec mycontainer /bin/sh -c "cmd1;cmd2;...;cmdn"
+docker run --rm -v "$(pwd)/pj-nft":/contract \
+  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
+  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+  enigmampc/secret-contract-optimizer:1.0.5
+
+docker exec secretdev /root/docker/store-contracts.sh
 
 # INIT='{"purchase_price":{"amount":"100","denom":"ucosm"},"transfer_price":{"amount":"999","denom":"ucosm"}}'
 # # deploy tutorial contract
