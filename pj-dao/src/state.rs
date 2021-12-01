@@ -28,7 +28,7 @@ pub const PREFIX_JOINERS: &[u8] = b"joiners";
 /// * `key` - a byte slice representing the key to access the stored item
 /// * `value` - a reference to the item to store
 pub fn save<T: Serialize, S: Storage>(storage: &mut S, key: &[u8], value: &T) -> StdResult<()> {
-    let b = Bincode2::serialize(value).map_err(|_| StdError::generic_err("serialisation"));
+    let b = Bincode2::serialize(value);
     storage.set(key, &b?);
     Ok(())
 }
@@ -54,7 +54,7 @@ pub fn load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8]) ->
     let de = &storage
         .get(key)
         .ok_or_else(|| StdError::not_found(type_name::<T>()))?;
-    Bincode2::deserialize(de).map_err(|e| StdError::generic_err(e.to_string()))
+    Bincode2::deserialize(de)
 }
 
 /// Returns StdResult<Option<T>> from retrieving the item with the specified key.
@@ -69,9 +69,7 @@ pub fn may_load<T: DeserializeOwned, S: ReadonlyStorage>(
     key: &[u8],
 ) -> StdResult<Option<T>> {
     match storage.get(key) {
-        Some(value) => Bincode2::deserialize(&value)
-            .map(Some)
-            .map_err(|e| StdError::generic_err(e.to_string())),
+        Some(value) => Bincode2::deserialize(&value).map(Some),
         None => Ok(None),
     }
 }
@@ -89,7 +87,7 @@ pub fn json_save<T: Serialize, S: Storage>(
     key: &[u8],
     value: &T,
 ) -> StdResult<()> {
-    let v = Json::serialize(value).map_err(|e| StdError::generic_err(e.to_string()));
+    let v = Json::serialize(value);
     storage.set(key, &v?);
     Ok(())
 }
@@ -106,7 +104,7 @@ pub fn json_load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8
     let de = &storage
         .get(key)
         .ok_or_else(|| StdError::not_found(type_name::<T>()))?;
-    Json::deserialize(de).map_err(|_| StdError::not_found("storage"))?
+    Json::deserialize(de)?
 }
 
 /// Returns StdResult<Option<T>> from retrieving the item with the specified key using Json
@@ -122,9 +120,7 @@ pub fn json_may_load<T: DeserializeOwned, S: ReadonlyStorage>(
     key: &[u8],
 ) -> StdResult<Option<T>> {
     match storage.get(key) {
-        Some(value) => Json::deserialize(&value)
-            .map(Some)
-            .map_err(|e| StdError::generic_err(e.to_string())),
+        Some(value) => Json::deserialize(&value).map(Some),
         None => Ok(None),
     }
 }
