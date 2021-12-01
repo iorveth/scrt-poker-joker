@@ -8,8 +8,9 @@ Pulling and setting the submodule
 
 Run the local node:
 
-1. make sure you have `local-node-setup.sh` and `docker/chain-setup.sh` as executables
+1. make sure you have `local-node-setup.sh`, `store-instantiate-contracts.sh` and `docker/*.sh` as executables
 1. run `./local-node-setup.sh `
+1. run `./store-instantiate-contracts.sh`
 
 This will provide you with Admin and 10 players with chain balance in uscrt
 
