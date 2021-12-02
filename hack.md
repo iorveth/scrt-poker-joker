@@ -8,8 +8,9 @@ Pulling and setting the submodule
 
 Run the local node:
 
-1. make sure you have `local-node-setup.sh` and `docker/chain-setup.sh` as executables
+1. make sure you have `local-node-setup.sh`, `store-instantiate-contracts.sh` and `docker/*.sh` as executables
 1. run `./local-node-setup.sh `
+1. run `./store-instantiate-contracts.sh`
 
 This will provide you with Admin and 10 players with chain balance in uscrt
 
@@ -50,14 +51,14 @@ This will provide you with Admin and 10 players with chain balance in uscrt
 1. Player 9 arrives on landing page
    1. Connect to wallet
    1. New Player page (button to start playing)
-   1. tx() -> `joinDao()` -> call back: on success redirect to user home page
+   1. DAO tx() -> `joinDao()` -> call back: on success redirect to user home page
    1. Dao contract mints NFT to player 9
    1. NFT display in player's inventory
 1. (optional) Player 9 attempts to starts game
    1. button to start game ()
-   1. tx() -> `startNewGame` -> call back: `Error::not_enough_scrt`
+   1. DAO tx() -> `startNewGame` -> call back: `Error::not_enough_scrt`
    1. popup? button to collateralise
-   1. tx() -> `collateral_init` -> pending
+   1. NFT tx() -> `collateral_init` -> pending
 1. (optional) manually provide collateral (nodejs script?)
 1. Player 9 starts game again -> success
 1. Player 1 arrives on landing page
@@ -65,14 +66,14 @@ This will provide you with Admin and 10 players with chain balance in uscrt
    1. Query: Sees active games (the one with Player 9)
    1. Query: Sees own NFTs
    1. joins player 9 with `join` game with a selected dice set
-   1. tx() -> `joinGame(nft_id)` -> call back: `Success (game_id)` -> redirect to game page
+   1. DAO tx() -> `joinGame(nft_id)` -> call back: `Success (game_id)` -> redirect to game page
 1. Player 1 and Player 9 roll dice - button
-   1. tx() -> `roll` -> call back: `dice outcome {}`
+   1. DAO tx() -> `roll(game_id)` -> call back: `dice outcome {}`
    1. Query: display dice outcome to both parties
 1. Reroll
-   1. tx() -> `reroll(number_of_dic)` -> `dice outcome {}`
+   1. DAO tx() -> `reroll(game_id, number_of_dic)` -> `dice outcome {}`
 1. End game
-   1. end game button tx() -> `endGame()` -> `pending_other_player` / `game ended`
+   1. DAO tx() -> `endGame(game_id)` -> `pending_other_player` / `game ended`
    1. if game ended -> home page
 1. Show balance update
    - if Player 9 loses, DAO will exercise the transfers `endGame()` should trigger check collateral
