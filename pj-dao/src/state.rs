@@ -10,15 +10,19 @@ use secret_toolkit::{
     storage::{AppendStore, AppendStoreMut},
 };
 
+// Max num of dices each player rolls in the game round
+pub const NUM_OF_DICES: u8 = 5; 
+
 pub static CONFIG_KEY: &[u8] = b"config";
-/// prefix for the storage of all Game IDs
-pub const PREFIX_GAMES_INDEX: &[u8] = b"gameIds";
-/// prefix for the storage of all Active Games
-pub const PREFIX_ACITVE_GAMES: &[u8] = b"activegame";
-/// prefix for the storage of all Pending Games
-pub const PREFIX_PENDING_GAMES: &[u8] = b"pendinggame";
-/// prefix for the storage of all Joiners
-pub const PREFIX_JOINERS: &[u8] = b"joiners";
+
+/// prefix for the games by their ids 
+pub const PREFIX_GAME_BY_ID: &[u8] = b"game";
+
+/// prefix for the last created game id
+pub const PREFIX_LAST_GAME_INDEX: &[u8] = b"gameId";
+
+/// prefix for the storage of all DAO members
+pub const PREFIX_MEMBER_BY_ID: &[u8] = b"member";
 
 /// Returns StdResult<()> resulting from saving an item to storage
 ///

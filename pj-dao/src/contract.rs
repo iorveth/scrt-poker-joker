@@ -1,8 +1,8 @@
 use crate::game::GameDetails;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
-    json_may_load, json_save, load, may_load, remove, save, PREFIX_ACITVE_GAMES, PREFIX_JOINERS,
-    PREFIX_PENDING_GAMES,
+    json_may_load, json_save, load, may_load, remove, save, PREFIX_GAME_BY_ID, PREFIX_LAST_GAME_INDEX,
+    PREFIX_MEMBER_BY_ID,
 };
 use cosmwasm_std::{
     log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin, CosmosMsg, Env, Extern,
@@ -28,12 +28,12 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             instantiate_nft_contract(deps, env, code_id)
         }
         HandleMsg::JoinDao {} => join_dao(deps, env),
-        HandleMsg::StartNewGame { nft_id, base_bet } => start_new_game(deps, env, nft_id, base_bet),
-        HandleMsg::JoinGame { nft_id, game_id } => join_game(deps, env, nft_id, game_id),
+        HandleMsg::StartNewGame { nft_id, base_bet, secret } => start_new_game(deps, env, nft_id, base_bet, secret),
+        HandleMsg::JoinGame { nft_id, game_id, secret } => join_game(deps, env, nft_id, game_id, secret),
         HandleMsg::Roll { game_id } => unimplemented!(),
         HandleMsg::ReRoll {
             game_id,
-            num_of_dice,
+            dices,
         } => unimplemented!(),
         HandleMsg::EndGame { game_id } => unimplemented!(),
     }
@@ -77,32 +77,13 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        // ActiveGameIds {},
-        // PendingGameIds {},
-        // ActiveGames {},
-        // PendingGames {},
-        // Game { GameId: u32 },
-        QueryMsg::ActiveGames {} => to_binary(&query_active_games(deps)?),
-        QueryMsg::PendingGames {} => to_binary(&query_pending_games(deps)?),
         QueryMsg::Game { game_id } => to_binary(&query_game(deps, game_id)?),
     }
-}
-
-fn query_active_games<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<Vec<GameDetails>> {
-    unimplemented!();
-}
-
-fn query_pending_games<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<Vec<GameDetails>> {
-    unimplemented!();
 }
 
 fn query_game<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     game_id: u32,
-) -> StdResult<Vec<GameDetails>> {
+) -> StdResult<GameDetails> {
     unimplemented!();
 }
