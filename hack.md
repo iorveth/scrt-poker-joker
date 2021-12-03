@@ -55,7 +55,7 @@ This will provide you with Admin and 10 players with chain balance in uscrt
    1. NFT display in player's inventory
 1. (optional) Player 9 attempts to starts game
    1. button to start game ()
-   1. DAO tx() -> `startNewGame` -> call back: `Error::not_enough_scrt`
+   1. DAO tx() -> `CreateNewGameRoom` -> call back: `Error::not_enough_scrt`
    1. popup? button to collateralise
    1. NFT tx() -> `collateral_init` -> pending
 1. (optional) manually provide collateral (nodejs script?)
@@ -98,7 +98,7 @@ This will provide you with Admin and 10 players with chain balance in uscrt
 #### DAO contract msg / queries
 
 1. joinDao
-1. startNewGame
+1. CreateNewGameRoom
 1. joinGame
 1. roll
 1. reroll
