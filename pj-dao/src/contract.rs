@@ -2,8 +2,8 @@ use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, GameDetails, GameStatus};
 use crate::msg::{HandleMsg, InitMsg, NftInitMsg, PostInitCallback, QueryMsg};
 use crate::state::{
-    games, games_mut, last_game_index, last_game_index_mut, nft_address, nft_address_mut,
-    nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
+    load_game, load_last_game_index, nft_address, save_game, save_last_game_index,
+    save_nft_address, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
@@ -16,12 +16,14 @@ pub type GameId = u64;
 
 pub type Secret = u64;
 
+pub const INIT_INDEX: GameId = 0;
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    last_game_index_mut(&mut deps.storage).save(&GameId::default())?;
+    save_last_game_index(&mut deps.storage, &INIT_INDEX)?;
     Ok(InitResponse::default())
 }
 
@@ -50,8 +52,11 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> ContractResult<HandleResponse> {
     match msg {
-        HandleMsg::CreateNFTContract { code_id } => create_nft_contract(deps, env, code_id),
-        HandleMsg::StoreNFTContract {} => store_nft_contract_addr(deps, env),
+        HandleMsg::CreateNftContract {
+            code_id,
+            callback_code_hash,
+        } => create_nft_contract(deps, env, code_id, callback_code_hash),
+        HandleMsg::StoreNftContract {} => store_nft_contract_addr(deps, env),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
@@ -71,7 +76,7 @@ pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
 ) -> ContractResult<HandleResponse> {
-    nft_address_mut(&mut deps.storage).save(&env.message.sender)?;
+    save_nft_address(&mut deps.storage, &env.message.sender)?;
     Ok(HandleResponse::default())
 }
 
@@ -79,8 +84,9 @@ pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
     _deps: &mut Extern<S, A, Q>,
     env: Env,
     code_id: u64,
+    callback_code_hash: String,
 ) -> ContractResult<HandleResponse> {
-    let store_addr_msg = HandleMsg::StoreNFTContract {};
+    let store_addr_msg = HandleMsg::StoreNftContract {};
     let post_init_callback = PostInitCallback {
         msg: to_binary(&store_addr_msg)?,
         contract_address: env.contract.address.clone(),
@@ -99,7 +105,7 @@ pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
     let instantiate_msg = CosmosMsg::Wasm(WasmMsg::Instantiate {
         code_id,
         send: vec![],
-        callback_code_hash: env.contract_code_hash,
+        callback_code_hash,
         msg: to_binary(&nft_instantiate_msg)?,
         label: "PJDAO-NFT".into(),
     });
@@ -127,18 +133,15 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     // ensure enough coins provided
     ensure_has_coins_for_game(&env, &base_bet)?;
 
-    let game_id = query_last_game_id(&deps)?;
+    let game_id = load_last_game_index(&deps.storage)?;
 
     let game = GameDetails::new(host_player_address, nft_id, base_bet);
 
     // save newly initialized game
-    games_mut(&mut deps.storage).save(&game_id.to_be_bytes(), &game)?;
+    save_game(&mut deps.storage, game_id, &game)?;
 
     // increment game index
-    last_game_index_mut(&mut deps.storage).update(|mut game_id| {
-        game_id += 1;
-        Ok(game_id)
-    })?;
+    save_last_game_index(&mut deps.storage, &(game_id + 1))?;
 
     Ok(HandleResponse::default())
 }
@@ -182,27 +185,26 @@ fn query_game<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     game_id: GameId,
 ) -> StdResult<GameDetails> {
-    games(&deps.storage).load(&game_id.to_be_bytes())
-}
-
-// returns last game id
-fn query_last_game_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<GameId> {
-    last_game_index(&deps.storage).load()
+    load_game(&deps.storage, game_id)
 }
 
 fn query_nft_address<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<HumanAddr> {
-    nft_address(&deps.storage).load()
+    nft_address(&deps.storage)
 }
 
 // returns a vector of [u8] game keys and their details
 fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     status: GameStatus,
-) -> StdResult<Vec<(Vec<u8>, GameDetails)>> {
-    games(&deps.storage)
-        .range(None, None, Order::Ascending)
+) -> StdResult<Vec<(GameId, GameDetails)>> {
+    (INIT_INDEX..=load_last_game_index(&deps.storage)?)
+        .into_iter()
+        .map(|i| match load_game(&deps.storage, i) {
+            Ok(game) => Ok((i, game)),
+            Err(e) => Err(e),
+        })
         .filter(|game_entry| {
             if let Ok((_, game)) = game_entry {
                 game.status == status

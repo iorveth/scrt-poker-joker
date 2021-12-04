@@ -14,11 +14,11 @@ require("dotenv").config({ path: `${__dirname}/../.env.dev` });
 
 const customFees = {
   upload: {
-    amount: [{ amount: "22000000", denom: "uscrt" }],
+    amount: [{ amount: "20000000", denom: "uscrt" }],
     gas: "20000000",
   },
   init: {
-    amount: [{ amount: "2500000", denom: "uscrt" }],
+    amount: [{ amount: "5000000", denom: "uscrt" }],
     gas: "5000000",
   },
   exec: {
@@ -57,49 +57,51 @@ const main = async () => {
 
   console.log(`Admin wallet address=${accAddress}`);
 
-   const daoWasm = fs.readFileSync("../pj-dao/contract.wasm");
-   let uploadReceipt = await signClient.upload(
-     daoWasm,
-     {},
-   );
-   const daoCodeId = uploadReceipt.codeId;
-console.log("uploaded dao wasm: ", daoCodeId)
+  const daoWasm = fs.readFileSync("../pj-dao/contract.wasm");
+  let uploadReceipt = await signClient.upload(daoWasm, {});
+  const daoCodeId = uploadReceipt.codeId;
+  console.log("uploaded dao wasm: ", daoCodeId);
 
-   const nftWasm = fs.readFileSync("../pj-nft/contract.wasm");
-   uploadReceipt = await signClient.upload(
-     nftWasm,
-     {},
-   );
-   const nftCodeId = uploadReceipt.codeId;
-console.log("uploaded nft wasm: ", nftCodeId)
+  const nftWasm = fs.readFileSync("../pj-nft/contract.wasm");
+  uploadReceipt = await signClient.upload(nftWasm, {});
+  const nftCodeId = uploadReceipt.codeId;
+  console.log("uploaded nft wasm: ", nftCodeId);
 
- //   const daoCodeId = 3;
- //   const nftCodeId = 4;
-
-  // contract hash, useful for contract composition
-  // const contractCodeHash = await signClient.restClient.getCodeHashByCodeId(codeId);
-
-  const daoInitMsg = {  };
+  const daoInitMsg = { nft_code_id: nftCodeId };
   const daoContract = await signClient.instantiate(
     daoCodeId,
     daoInitMsg,
     "PokerJokerDAO" + Math.ceil(Math.random() * 10000)
   );
-
-  console.log("instantiated dao contract: ", daoContract );
-
+  console.log("instantiated dao contract: ", daoContract);
+  const daoAddress = daoContract.contractAddress;
 
   console.log("instantiating nft contract");
-  const handleMsg = { create_nft_contract: {nft_code_id: nftCodeId} };
-  response = await client.execute(daoContract.contractAddress, handleMsg);
-  console.log("response: ", response);
+  const nftContractCodeHash = await signClient.restClient.getCodeHashByCodeId(
+    nftCodeId
+  );
+  const handleMsg = {
+    create_nft_contract: {
+      code_id: nftCodeId,
+      callback_code_hash: nftContractCodeHash,
+    },
+  };
+  await signClient.execute(daoContract.contractAddress, handleMsg);
 
-  console.log("Querying contract for nft contract");
-  let response = await client.queryContractSmart(daoContract, {
-   nft_address : {},
+  console.log("Querying dao contract for nft contract address");
+  const nftAddr = await signClient.queryContractSmart(daoAddress, {
+    nft_address: {},
+  });
+  console.log(`nftAddress: ${nftAddr}`);
+
+  console.log(
+    "Querying nft contract for contract info to ensure address is correct"
+  );
+  const nftInfo = await signClient.queryContractSmart(nftAddr, {
+    contract_info: {},
   });
 
-  console.log(`nftAddress=${response}`);
+  console.log(`nftInfo: `, nftInfo);
 };
 
 main();
