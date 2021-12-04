@@ -7,5 +7,9 @@ docker run --rm -v "$(pwd)/pj-dao":/contract \
 docker run --rm -v "$(pwd)/pj-nft":/contract \
   enigmampc/secret-contract-optimizer:1.0.5
 
-# This stores and instantiates the contract
-docker exec secretdev /root/code/docker/store-contracts.sh
+cd pj-dao/
+gzip -d contract.wasm.gz
+cd ../pj-nft/
+gzip -d contract.wasm.gz
+cd ../js-docker
+node deploy.js

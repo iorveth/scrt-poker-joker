@@ -1,75 +1,169 @@
-use crate::game::GameDetails;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::error::{ContractError, ContractResult};
+use crate::game::{locked_per_player, GameDetails, GameStatus};
+use crate::msg::{HandleMsg, InitMsg, NftInitMsg, PostInitCallback, QueryMsg};
 use crate::state::{
-    json_may_load, json_save, load, may_load, remove, save, PREFIX_ACITVE_GAMES, PREFIX_JOINERS,
-    PREFIX_PENDING_GAMES,
+    games, games_mut, last_game_index, last_game_index_mut, nft_address, nft_address_mut,
+    nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
 };
 use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin, CosmosMsg, Env, Extern,
-    HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult, Querier, QueryResult,
-    ReadonlyStorage, StdError, StdResult, Storage, WasmMsg,
+    coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
+    CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult,
+    Order, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage, WasmMsg, KV,
 };
+use std::convert::TryInto;
+
+pub type GameId = u64;
+
+pub type Secret = u64;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    last_game_index_mut(&mut deps.storage).save(&GameId::default())?;
     Ok(InitResponse::default())
 }
+
+// pub fn winner_winner_chicken_dinner(
+//     contract_address: HumanAddr,
+//     player: HumanAddr,
+//     amount: Uint128,
+// ) -> HandleResponse {
+//     HandleResponse {
+//         messages: vec![CosmosMsg::Bank(BankMsg::Send {
+//             from_address: contract_address,
+//             to_address: player,
+//             amount: vec![Coin {
+//                 denom: "uscrt".to_string(),
+//                 amount,
+//             }],
+//         })],
+//         log: vec![],
+//         data: None,
+//     }
+// }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> ContractResult<HandleResponse> {
     match msg {
-        HandleMsg::CreateDiceNFTContract { code_id } => {
-            instantiate_nft_contract(deps, env, code_id)
-        }
-        HandleMsg::JoinDao {} => join_dao(deps, env),
-        HandleMsg::StartNewGame { nft_id, base_bet } => start_new_game(deps, env, nft_id, base_bet),
-        HandleMsg::JoinGame { nft_id, game_id } => join_game(deps, env, nft_id, game_id),
-        HandleMsg::Roll { game_id } => unimplemented!(),
-        HandleMsg::ReRoll {
+        HandleMsg::CreateNFTContract { code_id } => create_nft_contract(deps, env, code_id),
+        HandleMsg::StoreNFTContract {} => store_nft_contract_addr(deps, env),
+        HandleMsg::CreateNewGameRoom {
+            nft_id,
+            base_bet,
+            secret,
+        } => create_new_game_room(deps, env, nft_id, base_bet, secret),
+        HandleMsg::JoinGame {
+            nft_id,
             game_id,
-            num_of_dice,
-        } => unimplemented!(),
-        HandleMsg::EndGame { game_id } => unimplemented!(),
+            secret,
+        } => join_game(deps, env, nft_id, game_id, secret),
+        HandleMsg::Roll { game_id } => unimplemented!(),
+        HandleMsg::ReRoll { game_id, dices } => unimplemented!(),
     }
 }
 
-pub fn instantiate_nft_contract<S: Storage, A: Api, Q: Querier>(
+pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
+    env: Env,
+) -> ContractResult<HandleResponse> {
+    nft_address_mut(&mut deps.storage).save(&env.message.sender)?;
+    Ok(HandleResponse::default())
+}
+
+pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
+    _deps: &mut Extern<S, A, Q>,
     env: Env,
     code_id: u64,
-) -> HandleResult {
-    unimplemented!()
+) -> ContractResult<HandleResponse> {
+    let store_addr_msg = HandleMsg::StoreNFTContract {};
+    let post_init_callback = PostInitCallback {
+        msg: to_binary(&store_addr_msg)?,
+        contract_address: env.contract.address.clone(),
+        code_hash: env.contract_code_hash.clone(),
+        send: vec![],
+    };
+    let nft_instantiate_msg = NftInitMsg {
+        name: "PokerJokerNFT".into(),
+        symbol: "PJX".into(),
+        admin: Some(env.contract.address),
+        entropy: "HACKATOM IV".into(),
+        royalty_info: None,
+        config: None,
+        post_init_callback: Some(post_init_callback),
+    };
+    let instantiate_msg = CosmosMsg::Wasm(WasmMsg::Instantiate {
+        code_id,
+        send: vec![],
+        callback_code_hash: env.contract_code_hash,
+        msg: to_binary(&nft_instantiate_msg)?,
+        label: "PJDAO-NFT".into(),
+    });
+
+    Ok(HandleResponse {
+        messages: vec![instantiate_msg],
+        log: vec![],
+        data: None,
+    })
 }
 
-pub fn join_dao<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-) -> HandleResult {
-    unimplemented!()
-}
-
-pub fn start_new_game<S: Storage, A: Api, Q: Querier>(
+pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     nft_id: String,
     base_bet: Coin,
-) -> HandleResult {
-    unimplemented!()
+    secret: Secret,
+) -> ContractResult<HandleResponse> {
+    // check whether nft supports base bet
+
+    // check whether dao member
+
+    let host_player_address = deps.api.canonical_address(&env.message.sender)?;
+
+    // ensure enough coins provided
+    ensure_has_coins_for_game(&env, &base_bet)?;
+
+    let game_id = query_last_game_id(&deps)?;
+
+    let game = GameDetails::new(host_player_address, nft_id, base_bet);
+
+    // save newly initialized game
+    games_mut(&mut deps.storage).save(&game_id.to_be_bytes(), &game)?;
+
+    // increment game index
+    last_game_index_mut(&mut deps.storage).update(|mut game_id| {
+        game_id += 1;
+        Ok(game_id)
+    })?;
+
+    Ok(HandleResponse::default())
 }
 
 pub fn join_game<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     nft_id: String,
-    game_id: u32,
-) -> HandleResult {
-    unimplemented!()
+    game_id: GameId,
+    secret: Secret,
+) -> ContractResult<HandleResponse> {
+    // check whether nft supports base_bet
+
+    // check whether dao member
+
+    // ensure game exists
+    let game = query_game(deps, game_id)?;
+
+    // ensure enough coins provided
+    ensure_has_coins_for_game(&env, &game.base_bet)?;
+
+    // ensure game status is set to pending
+    game.status.ensure_is_pending()?;
+
+    Ok(HandleResponse::default())
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -77,32 +171,56 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        // ActiveGameIds {},
-        // PendingGameIds {},
-        // ActiveGames {},
-        // PendingGames {},
-        // Game { GameId: u32 },
-        QueryMsg::ActiveGames {} => to_binary(&query_active_games(deps)?),
-        QueryMsg::PendingGames {} => to_binary(&query_pending_games(deps)?),
         QueryMsg::Game { game_id } => to_binary(&query_game(deps, game_id)?),
+        QueryMsg::GamesByStatus { status } => to_binary(&query_games_by_status(deps, status)?),
+        QueryMsg::NftAddress {} => to_binary(&query_nft_address(deps)?),
     }
 }
 
-fn query_active_games<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<Vec<GameDetails>> {
-    unimplemented!();
-}
-
-fn query_pending_games<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<Vec<GameDetails>> {
-    unimplemented!();
-}
-
+// query game by it's id
 fn query_game<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-    game_id: u32,
-) -> StdResult<Vec<GameDetails>> {
-    unimplemented!();
+    game_id: GameId,
+) -> StdResult<GameDetails> {
+    games(&deps.storage).load(&game_id.to_be_bytes())
+}
+
+// returns last game id
+fn query_last_game_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<GameId> {
+    last_game_index(&deps.storage).load()
+}
+
+fn query_nft_address<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<HumanAddr> {
+    nft_address(&deps.storage).load()
+}
+
+// returns a vector of [u8] game keys and their details
+fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    status: GameStatus,
+) -> StdResult<Vec<(Vec<u8>, GameDetails)>> {
+    games(&deps.storage)
+        .range(None, None, Order::Ascending)
+        .filter(|game_entry| {
+            if let Ok((_, game)) = game_entry {
+                game.status == status
+            } else {
+                false
+            }
+        })
+        .collect()
+}
+
+// Check whether given player provided max amount of coins, that can potentially be lost in the game
+pub fn ensure_has_coins_for_game(env: &Env, base_bet: &Coin) -> ContractResult<()> {
+    // should be at least 10 x base_bet
+    if !has_coins(&env.message.sent_funds, &locked_per_player(base_bet)) {
+        Err(StdError::generic_err(
+            ContractError::NotEnoughTokensForTheGame {}.to_string(),
+        ))
+    } else {
+        Ok(())
+    }
 }

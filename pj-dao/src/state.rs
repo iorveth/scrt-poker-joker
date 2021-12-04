@@ -2,8 +2,16 @@ use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::any::type_name;
 
-use cosmwasm_std::{Api, BlockInfo, CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage};
-use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
+use crate::contract::GameId;
+use crate::game::GameDetails;
+
+use cosmwasm_std::{
+    Api, BlockInfo, CanonicalAddr, HumanAddr, ReadonlyStorage, StdError, StdResult, Storage,
+};
+use cosmwasm_storage::{
+    bucket, bucket_read, singleton, singleton_read, Bucket, PrefixedStorage, ReadonlyBucket,
+    ReadonlyPrefixedStorage, ReadonlySingleton, Singleton,
+};
 
 use secret_toolkit::{
     serialization::{Bincode2, Json, Serde},
@@ -11,116 +19,61 @@ use secret_toolkit::{
 };
 
 pub static CONFIG_KEY: &[u8] = b"config";
-/// prefix for the storage of all Game IDs
-pub const PREFIX_GAMES_INDEX: &[u8] = b"gameIds";
-/// prefix for the storage of all Active Games
-pub const PREFIX_ACITVE_GAMES: &[u8] = b"activegame";
-/// prefix for the storage of all Pending Games
-pub const PREFIX_PENDING_GAMES: &[u8] = b"pendinggame";
-/// prefix for the storage of all Joiners
-pub const PREFIX_JOINERS: &[u8] = b"joiners";
 
-/// Returns StdResult<()> resulting from saving an item to storage
-///
-/// # Arguments
-///
-/// * `storage` - a mutable reference to the storage this item should go to
-/// * `key` - a byte slice representing the key to access the stored item
-/// * `value` - a reference to the item to store
+/// prefix for the games
+pub const PREFIX_GAMES: &[u8] = b"games";
+
+/// prefix for the last created game id
+pub const PREFIX_LAST_GAME_INDEX: &[u8] = b"gameId";
+
+/// prefix for the nft contract address
+pub const PREFIX_NFT_CONTRACT: &[u8] = b"nftContract";
+
+/// prefix for the nft code id
+pub const PREFIX_NFT_CODE_ID: &[u8] = b"nftCodeId";
+
+// There is issue with using certain buckets and singletone for wasm, the contract does not run on the secret
+// network node.
+// if you go to scrt discord and search db_scan you will find the conversation I have pasted below:
+//
+// IIRC I think it fails because SecretNetwork doesn't implement db_scan
+// And I think I was told that if it was implemented, all the keys you get with your key-value pairs from range would be encrypted anyway, but that was back during phase 2 testnet, so my memory might be off
+// Assaf | SCRT Labs — 27/11/2020
+// Yep we decided db_scan is very hard to implement in a secure way. We felt that the use case for it is thin at best and went ahead with the mainnet release.
+// I'd recommend though to use bincode2 for storage serialization (more efficient) and serde_json_wasm for query result (better ux)
+
 pub fn save<T: Serialize, S: Storage>(storage: &mut S, key: &[u8], value: &T) -> StdResult<()> {
-    let b = Bincode2::serialize(value);
-    storage.set(key, &b?);
+    storage.set(PREFIX_GAMES, &Bincode2::serialize(value)?);
     Ok(())
 }
 
-/// Removes an item from storage
-///
-/// # Arguments
-///
-/// * `storage` - a mutable reference to the storage this item is in
-/// * `key` - a byte slice representing the key that accesses the stored item
-pub fn remove<S: Storage>(storage: &mut S, key: &[u8]) {
-    storage.remove(key);
+pub fn games_mut<'a, S: Storage>(storage: &'a mut S) -> Bucket<'a, S, GameDetails> {
+    bucket(PREFIX_GAMES, storage)
 }
 
-/// Returns StdResult<T> from retrieving the item with the specified key.  Returns a
-/// StdError::NotFound if there is no item with that key
-///
-/// # Arguments
-///
-/// * `storage` - a reference to the storage this item is in
-/// * `key` - a byte slice representing the key that accesses the stored item
-pub fn load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8]) -> StdResult<T> {
-    let de = &storage
-        .get(key)
-        .ok_or_else(|| StdError::not_found(type_name::<T>()))?;
-    Bincode2::deserialize(de)
+pub fn games<'a, S: Storage>(storage: &'a S) -> ReadonlyBucket<'a, S, GameDetails> {
+    bucket_read(PREFIX_GAMES, storage)
 }
 
-/// Returns StdResult<Option<T>> from retrieving the item with the specified key.
-/// Returns Ok(None) if there is no item with that key
-///
-/// # Arguments
-///
-/// * `storage` - a reference to the storage this item is in
-/// * `key` - a byte slice representing the key that accesses the stored item
-pub fn may_load<T: DeserializeOwned, S: ReadonlyStorage>(
-    storage: &S,
-    key: &[u8],
-) -> StdResult<Option<T>> {
-    match storage.get(key) {
-        Some(value) => Bincode2::deserialize(&value).map(Some),
-        None => Ok(None),
-    }
+// last game index
+pub fn last_game_index_mut<'a, S: Storage>(storage: &'a mut S) -> Singleton<'a, S, GameId> {
+    singleton(storage, PREFIX_LAST_GAME_INDEX)
 }
 
-/// Returns StdResult<()> resulting from saving an item to storage using Json (de)serialization
-/// because bincode2 annoyingly uses a float op when deserializing an enum
-///
-/// # Arguments
-///
-/// * `storage` - a mutable reference to the storage this item should go to
-/// * `key` - a byte slice representing the key to access the stored item
-/// * `value` - a reference to the item to store
-pub fn json_save<T: Serialize, S: Storage>(
-    storage: &mut S,
-    key: &[u8],
-    value: &T,
-) -> StdResult<()> {
-    let v = Json::serialize(value);
-    storage.set(key, &v?);
-    Ok(())
+// readonly last game index
+pub fn last_game_index<'a, S: Storage>(storage: &'a S) -> ReadonlySingleton<'a, S, GameId> {
+    singleton_read(storage, PREFIX_LAST_GAME_INDEX)
+}
+// supporting nft contract
+// currently only 1
+pub fn nft_address_mut<'a, S: Storage>(storage: &'a mut S) -> Singleton<'a, S, HumanAddr> {
+    singleton(storage, PREFIX_NFT_CONTRACT)
+}
+pub fn nft_address<'a, S: Storage>(storage: &'a S) -> ReadonlySingleton<'a, S, HumanAddr> {
+    singleton_read(storage, PREFIX_NFT_CONTRACT)
 }
 
-/// Returns StdResult<T> from retrieving the item with the specified key using Json
-/// (de)serialization because bincode2 annoyingly uses a float op when deserializing an enum.
-/// Returns a StdError::NotFound if there is no item with that key
-///
-/// # Arguments
-///
-/// * `storage` - a reference to the storage this item is in
-/// * `key` - a byte slice representing the key that accesses the stored item
-pub fn json_load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8]) -> StdResult<T> {
-    let de = &storage
-        .get(key)
-        .ok_or_else(|| StdError::not_found(type_name::<T>()))?;
-    Json::deserialize(de)?
-}
-
-/// Returns StdResult<Option<T>> from retrieving the item with the specified key using Json
-/// (de)serialization because bincode2 annoyingly uses a float op when deserializing an enum.
-/// Returns Ok(None) if there is no item with that key
-///
-/// # Arguments
-///
-/// * `storage` - a reference to the storage this item is in
-/// * `key` - a byte slice representing the key that accesses the stored item
-pub fn json_may_load<T: DeserializeOwned, S: ReadonlyStorage>(
-    storage: &S,
-    key: &[u8],
-) -> StdResult<Option<T>> {
-    match storage.get(key) {
-        Some(value) => Json::deserialize(&value).map(Some),
-        None => Ok(None),
-    }
+// supporting nft code id
+pub fn nft_code_id<'a, S: Storage>(storage: &'a mut S) -> Singleton<'a, S, u64> {
+    singleton(storage, PREFIX_NFT_CODE_ID)
 }

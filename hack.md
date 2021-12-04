@@ -56,17 +56,47 @@ This will provide you with Admin and 10 players with chain balance in uscrt
    1. NFT display in player's inventory
 1. (optional) Player 9 attempts to starts game
    1. button to start game ()
-   1. DAO tx() -> `startNewGame` -> call back: `Error::not_enough_scrt`
+   1. DAO tx() -> `CreateNewGameRoom` -> call back: `Error::not_enough_scrt`
    1. popup? button to collateralise
    1. NFT tx() -> `collateral_init` -> pending
 1. (optional) manually provide collateral (nodejs script?)
 1. Player 9 starts game again -> success
 1. Player 1 arrives on landing page
+
    1. Connect to wallet
-   1. Query: Sees active games (the one with Player 9)
-   1. Query: Sees own NFTs
+   1. Game Query: Sees active games (the one with Player 9)
+   1. NFT Query: Sees owned NFTs of wallet. use `tokens` query to get a list of token_ids then get each token's metadata via `NftInfo` query
+
+   ```rust
+    Tokens {
+        owner: HumanAddr,
+        /// optional address of the querier if different from the owner
+        viewer: Option<HumanAddr>,
+        /// optional viewing key
+        viewing_key: Option<String>,
+        /// paginate by providing the last token_id received in the previous query
+        start_after: Option<String>,
+        /// optional number of token ids to display
+        limit: Option<u32>,
+    },
+   NftInfo { token_id: String },
+   ```
+
+   The `NftInfo` returned is in the form of:
+
+   ```rust
+    NftInfo {
+        token_uri: Option<String>,
+        extension: Option<Extension>,
+    },
+   ```
+
+   - using the `NftInfo.extensions.description` as the `xp`
+   - using the `NftInfo.extension.attributes` as the colour displays
+
    1. joins player 9 with `join` game with a selected dice set
    1. DAO tx() -> `joinGame(nft_id)` -> call back: `Success (game_id)` -> redirect to game page
+
 1. Player 1 and Player 9 roll dice - button
    1. DAO tx() -> `roll(game_id)` -> call back: `dice outcome {}`
    1. Query: display dice outcome to both parties
@@ -99,7 +129,7 @@ This will provide you with Admin and 10 players with chain balance in uscrt
 #### DAO contract msg / queries
 
 1. joinDao
-1. startNewGame
+1. CreateNewGameRoom
 1. joinGame
 1. roll
 1. reroll

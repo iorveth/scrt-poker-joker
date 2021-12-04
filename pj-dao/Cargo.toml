@@ -27,10 +27,11 @@ incremental = false
 overflow-checks = true
 
 [features]
-default = []
+default = ["iterator"]
 # for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces"]
+iterator = ["cosmwasm-std/iterator", "cosmwasm-storage/iterator"]
 
 [dependencies]
 secret-toolkit = { git = "https://github.com/enigmampc/secret-toolkit" }
@@ -40,6 +41,7 @@ cosmwasm-storage = { git = "https://github.com/enigmampc/SecretNetwork", tag = "
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
+thiserror = { version = "1.0.26" }
 
 
 #cosmwasm-schema = { git = "https://github.com/enigmampc/SecretNetwork", tag = "v1.0.0" }
