@@ -1,5 +1,5 @@
 use crate::error::{ContractError, ContractResult};
-use cosmwasm_std::{coin, Coin,CanonicalAddr, StdError};
+use cosmwasm_std::{coin, CanonicalAddr, Coin, StdError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
