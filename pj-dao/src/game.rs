@@ -1,5 +1,5 @@
 use crate::error::{ContractError, ContractResult};
-use cosmwasm_std::{coin, CanonicalAddr, Coin};
+use cosmwasm_std::{coin, Coin,CanonicalAddr, StdError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -119,7 +119,9 @@ impl GameStatus {
     /// Ensure GameStatus is set to Pending
     pub fn ensure_is_pending(&self) -> ContractResult<()> {
         if self.ne(&GameStatus::Pending) {
-            Err(ContractError::GameNotInPendingStatus {})
+            Err(StdError::generic_err(
+                ContractError::GameNotInPendingStatus {}.to_string(),
+            ))
         } else {
             Ok(())
         }
@@ -128,7 +130,9 @@ impl GameStatus {
     /// Ensure GameStatus is set to Started
     pub fn ensure_is_started(&self) -> ContractResult<()> {
         if self.ne(&GameStatus::Started) {
-            Err(ContractError::GameNotInStartedStatus {})
+            Err(StdError::generic_err(
+                ContractError::GameNotInStartedStatus {}.to_string(),
+            ))
         } else {
             Ok(())
         }
@@ -137,7 +141,9 @@ impl GameStatus {
     /// Ensure GameStatus is set to Reroll
     pub fn ensure_is_reroll(&self) -> ContractResult<()> {
         if self.ne(&GameStatus::ReRoll) {
-            Err(ContractError::GameNotInRerollStatus {})
+            Err(StdError::generic_err(
+                ContractError::GameNotInRerollStatus {}.to_string(),
+            ))
         } else {
             Ok(())
         }

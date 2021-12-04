@@ -1,7 +1,8 @@
 use cosmwasm_std::StdError;
 use thiserror::Error;
 
-pub type ContractResult<T> = Result<T, ContractError>;
+// pub type ContractResult<T> = Result<T, ContractError>;
+pub type ContractResult<T> = Result<T, StdError>;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
