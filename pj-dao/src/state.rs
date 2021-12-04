@@ -29,6 +29,9 @@ pub const PREFIX_NFT_CONTRACT: &[u8] = b"nftContract";
 /// prefix for the nft code id
 pub const PREFIX_NFT_CODE_ID: &[u8] = b"nftCodeId";
 
+/// prefix for the nft code hash
+pub const PREFIX_NFT_CODE_HASH: &[u8] = b"nftCodeHash";
+
 // last game index
 pub fn save_last_game_index<'a, S: Storage>(storage: &'a mut S, index: &GameId) -> StdResult<()> {
     save(storage, PREFIX_LAST_GAME_INDEX, index)
@@ -50,6 +53,22 @@ pub fn save_nft_address<'a, S: Storage>(
 
 pub fn nft_address<'a, S: Storage>(storage: &'a S) -> StdResult<HumanAddr> {
     load(storage, PREFIX_NFT_CONTRACT)
+}
+
+pub fn save_nft_code_id<'a, S: Storage>(storage: &'a mut S, id: u64) -> StdResult<()> {
+    save(storage, PREFIX_NFT_CODE_ID, &id)
+}
+
+pub fn nft_code_id<'a, S: Storage>(storage: &'a S) -> StdResult<u64> {
+    load(storage, PREFIX_NFT_CODE_ID)
+}
+
+pub fn save_nft_code_hash<'a, S: Storage>(storage: &'a mut S, hash: String) -> StdResult<()> {
+    save(storage, PREFIX_NFT_CODE_HASH, &hash)
+}
+
+pub fn nft_code_hash<'a, S: Storage>(storage: &'a S) -> StdResult<String> {
+    load(storage, PREFIX_NFT_CODE_HASH)
 }
 
 // supporting nft code id

@@ -67,7 +67,13 @@ const main = async () => {
   const nftCodeId = uploadReceipt.codeId;
   console.log("uploaded nft wasm: ", nftCodeId);
 
-  const daoInitMsg = { nft_code_id: nftCodeId };
+  const nftContractCodeHash = await signClient.restClient.getCodeHashByCodeId(
+    nftCodeId
+  );
+  const daoInitMsg = {
+    nft_code_id: nftCodeId,
+    nft_code_hash: nftContractCodeHash,
+  };
   const daoContract = await signClient.instantiate(
     daoCodeId,
     daoInitMsg,
@@ -77,16 +83,16 @@ const main = async () => {
   const daoAddress = daoContract.contractAddress;
 
   console.log("instantiating nft contract");
-  const nftContractCodeHash = await signClient.restClient.getCodeHashByCodeId(
-    nftCodeId
-  );
-  const handleMsg = {
-    create_nft_contract: {
-      code_id: nftCodeId,
-      callback_code_hash: nftContractCodeHash,
-    },
+  const createContractMsg = {
+    create_nft_contract: {},
   };
-  await signClient.execute(daoContract.contractAddress, handleMsg);
+
+  try {
+    await signClient.execute(daoContract.contractAddress, createContractMsg);
+  } catch (e) {
+    console.log("probably already deployed, nvm");
+    console.log(e);
+  }
 
   console.log("Querying dao contract for nft contract address");
   const nftAddr = await signClient.queryContractSmart(daoAddress, {
@@ -102,6 +108,27 @@ const main = async () => {
   });
 
   console.log(`nftInfo: `, nftInfo);
+
+  // ---- Deployment done ----
+
+  console.log("player 1 joins dao and we mint nft for them");
+  const player1 = process.env.PLAYER1_MNEMONIC;
+  const signingPen1 = await Secp256k1Pen.fromMnemonic(player1);
+  const pubkey1 = encodeSecp256k1Pubkey(signingPen1.pubkey);
+  const accAddress1 = pubkeyToAddress(pubkey1, "secret");
+  const txEncryptionSeed1 = EnigmaUtils.GenerateNewSeed();
+  const player1Client = new SigningCosmWasmClient(
+    httpUrl,
+    accAddress1,
+    (signBytes) => signingPen1.sign(signBytes),
+    txEncryptionSeed1,
+    customFees
+  );
+
+  // This is basically minting nft for the signer at the moment
+  const joinDaoMsg = { join_dao: { nft_id: "" } };
+  let r = await player1Client.execute(daoContract.contractAddress, joinDaoMsg);
+  console.log("joined Dao and mint: ", JSON.stringify(r));
 };
 
 main();

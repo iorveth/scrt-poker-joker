@@ -1,9 +1,10 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, GameDetails, GameStatus};
-use crate::msg::{HandleMsg, InitMsg, NftInitMsg, PostInitCallback, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, NftHandleMsg, NftInitMsg, PostInitCallback, QueryMsg};
 use crate::state::{
-    load_game, load_last_game_index, nft_address, save_game, save_last_game_index,
-    save_nft_address, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
+    load_game, load_last_game_index, nft_address, nft_code_hash, nft_code_id, save_game,
+    save_last_game_index, save_nft_address, save_nft_code_hash, save_nft_code_id,
+    PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
@@ -24,6 +25,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
     save_last_game_index(&mut deps.storage, &INIT_INDEX)?;
+    save_nft_code_hash(&mut deps.storage, msg.nft_code_hash)?;
+    save_nft_code_id(&mut deps.storage, msg.nft_code_id)?;
+
     Ok(InitResponse::default())
 }
 
@@ -52,11 +56,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> ContractResult<HandleResponse> {
     match msg {
-        HandleMsg::CreateNftContract {
-            code_id,
-            callback_code_hash,
-        } => create_nft_contract(deps, env, code_id, callback_code_hash),
+        HandleMsg::CreateNftContract {} => create_nft_contract(deps, env),
         HandleMsg::StoreNftContract {} => store_nft_contract_addr(deps, env),
+        HandleMsg::JoinDao { nft_id } => join_dao(deps, env, nft_id),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
@@ -72,6 +74,33 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+pub fn join_dao<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    _with_nft: Option<String>,
+) -> ContractResult<HandleResponse> {
+    // TODO: do we need to mint for this user?
+    // TODO: charge user?
+    let mint_dice_msg = NftHandleMsg::MintDiceNft {
+        owner: Some(env.message.sender.clone()),
+        private_metadata: None,
+    };
+
+    let contract_addr = nft_address(&deps.storage)?;
+    let callback_code_hash = nft_code_hash(&deps.storage)?;
+    let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr,
+        callback_code_hash,
+        msg: to_binary(&mint_dice_msg)?,
+        send: vec![],
+    });
+    Ok(HandleResponse {
+        messages: vec![mint_msg],
+        log: vec![log("joined", env.message.sender)],
+        data: None,
+    })
+}
+
 pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
@@ -81,11 +110,11 @@ pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
-    _deps: &mut Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     env: Env,
-    code_id: u64,
-    callback_code_hash: String,
 ) -> ContractResult<HandleResponse> {
+    let code_id = nft_code_id(&deps.storage)?;
+    let callback_code_hash = nft_code_hash(&deps.storage)?;
     let store_addr_msg = HandleMsg::StoreNftContract {};
     let post_init_callback = PostInitCallback {
         msg: to_binary(&store_addr_msg)?,
