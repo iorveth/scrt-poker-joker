@@ -63,20 +63,20 @@ pub fn save_game<S: Storage>(
     value: &GameDetails,
 ) -> StdResult<()> {
     let key: Vec<u8> = PREFIX_GAMES
-        .into_iter()
-        .chain(game_id.to_be_bytes().into_iter())
+        .iter()
+        .chain(game_id.to_be_bytes().iter())
         .copied()
         .collect();
-    save(storage, &key, value)
+    json_save(storage, &key, value)
 }
 
 pub fn load_game<S: Storage>(storage: &S, game_id: GameId) -> StdResult<GameDetails> {
     let key: Vec<u8> = PREFIX_GAMES
-        .into_iter()
-        .chain(game_id.to_be_bytes().into_iter())
+        .iter()
+        .chain(game_id.to_be_bytes().iter())
         .copied()
         .collect();
-    load(storage, &key)
+    json_load(storage, &key)
 }
 
 /// Returns StdResult<()> resulting from saving an item to storage

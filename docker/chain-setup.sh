@@ -56,7 +56,7 @@ then
   secretd keys add c
   secretd keys add d
 
-  secretd add-genesis-account $ADMIN_ADDR 200000000uscrt
+  secretd add-genesis-account $ADMIN_ADDR 20000000000000000000000000uscrt
   secretd add-genesis-account $PLAYER1_ADDR 200000uscrt
   secretd add-genesis-account $PLAYER2_ADDR 200000uscrt
   secretd add-genesis-account $PLAYER3_ADDR 200000uscrt

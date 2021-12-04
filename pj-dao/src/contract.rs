@@ -52,8 +52,11 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> ContractResult<HandleResponse> {
     match msg {
-        HandleMsg::CreateNFTContract { code_id } => create_nft_contract(deps, env, code_id),
-        HandleMsg::StoreNFTContract {} => store_nft_contract_addr(deps, env),
+        HandleMsg::CreateNftContract {
+            code_id,
+            callback_code_hash,
+        } => create_nft_contract(deps, env, code_id, callback_code_hash),
+        HandleMsg::StoreNftContract {} => store_nft_contract_addr(deps, env),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
@@ -81,8 +84,9 @@ pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
     _deps: &mut Extern<S, A, Q>,
     env: Env,
     code_id: u64,
+    callback_code_hash: String,
 ) -> ContractResult<HandleResponse> {
-    let store_addr_msg = HandleMsg::StoreNFTContract {};
+    let store_addr_msg = HandleMsg::StoreNftContract {};
     let post_init_callback = PostInitCallback {
         msg: to_binary(&store_addr_msg)?,
         contract_address: env.contract.address.clone(),
@@ -101,7 +105,7 @@ pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
     let instantiate_msg = CosmosMsg::Wasm(WasmMsg::Instantiate {
         code_id,
         send: vec![],
-        callback_code_hash: env.contract_code_hash,
+        callback_code_hash,
         msg: to_binary(&nft_instantiate_msg)?,
         label: "PJDAO-NFT".into(),
     });

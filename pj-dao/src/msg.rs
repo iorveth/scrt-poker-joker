@@ -16,10 +16,11 @@ pub struct InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    CreateNFTContract {
+    CreateNftContract {
         code_id: u64,
+        callback_code_hash: String,
     },
-    StoreNFTContract {},
+    StoreNftContract {},
     CreateNewGameRoom {
         nft_id: String,
         base_bet: Coin,
