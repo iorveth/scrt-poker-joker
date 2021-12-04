@@ -64,7 +64,6 @@ pub fn last_game_index_mut<'a, S: Storage>(storage: &'a mut S) -> Singleton<'a, 
 pub fn last_game_index<'a, S: Storage>(storage: &'a S) -> ReadonlySingleton<'a, S, GameId> {
     singleton_read(storage, PREFIX_LAST_GAME_INDEX)
 }
-}
 // supporting nft contract
 // currently only 1
 pub fn nft_address_mut<'a, S: Storage>(storage: &'a mut S) -> Singleton<'a, S, HumanAddr> {

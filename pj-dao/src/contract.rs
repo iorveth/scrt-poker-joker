@@ -2,8 +2,8 @@ use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, GameDetails, GameStatus};
 use crate::msg::{HandleMsg, InitMsg, NftInitMsg, PostInitCallback, QueryMsg};
 use crate::state::{
-    games, games_mut, last_game_index, nft_address, nft_address_mut, nft_code_id,
-    PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
+    games, games_mut, last_game_index, last_game_index_mut, nft_address, nft_address_mut,
+    nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
