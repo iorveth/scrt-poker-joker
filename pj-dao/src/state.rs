@@ -8,7 +8,7 @@ use crate::game::GameDetails;
 use cosmwasm_std::{Api, BlockInfo, CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, PrefixedStorage, ReadonlyBucket,
-    ReadonlyPrefixedStorage, Singleton, ReadonlySingleton
+    ReadonlyPrefixedStorage, ReadonlySingleton, Singleton,
 };
 
 use secret_toolkit::{

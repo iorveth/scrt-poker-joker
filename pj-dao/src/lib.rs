@@ -4,6 +4,8 @@ pub mod game;
 pub mod msg;
 pub mod state;
 
+// IT seems that this functions does not support custom error. ;(
+
 // #[cfg(target_arch = "wasm32")]
 // mod wasm {
 //     use super::contract;

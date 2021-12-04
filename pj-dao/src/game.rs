@@ -1,5 +1,5 @@
 use crate::error::{ContractError, ContractResult};
-use cosmwasm_std::{coin, Coin, HumanAddr};
+use cosmwasm_std::{coin, CanonicalAddr, Coin};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,7 @@ pub const NUM_OF_DICES: usize = 5;
 // (5 dices) x 2 rounds
 pub type Rolls = [Option<[u8; NUM_OF_DICES]>; TOTAL_ROUNDS];
 
-// An amount locked per player for game
+// An amount locked per player for a game
 pub fn locked_per_player(base_bet: &Coin) -> Coin {
     coin(
         base_bet.amount.u128() * NUM_OF_DICES as u128 * TOTAL_ROUNDS as u128,
@@ -26,8 +26,8 @@ pub struct GameDetails {
     pub status: GameStatus,
     // whether the game is shielded
     pub shielded: bool,
-    pub host_player_address: HumanAddr,
-    pub joined_player_address: HumanAddr,
+    pub host_player_address: CanonicalAddr,
+    pub joined_player_address: CanonicalAddr,
     pub host_player_nft_id: String,
     pub joined_player_nft_id: String,
     // base bet per each dice
@@ -47,7 +47,11 @@ pub struct GameDetails {
 }
 
 impl GameDetails {
-    pub fn new(host_player_address: HumanAddr, host_player_nft_id: String, base_bet: Coin) -> Self {
+    pub fn new(
+        host_player_address: CanonicalAddr,
+        host_player_nft_id: String,
+        base_bet: Coin,
+    ) -> Self {
         Self {
             status: GameStatus::Pending,
             shielded: false,
@@ -60,7 +64,7 @@ impl GameDetails {
     }
 
     /// Join the game
-    pub fn join(&mut self, joined_player_address: HumanAddr, joined_player_nft_id: String) {
+    pub fn join(&mut self, joined_player_address: CanonicalAddr, joined_player_nft_id: String) {
         self.joined_player_address = joined_player_address;
         self.joined_player_nft_id = joined_player_nft_id;
 
@@ -74,6 +78,9 @@ impl GameDetails {
             Player::Host => {}
             Player::Joined => {}
         }
+
+        // game started
+        self.status = GameStatus::ReRoll;
     }
 
     /// Reroll chosen dices

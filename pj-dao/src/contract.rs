@@ -1,12 +1,13 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, GameDetails, GameStatus};
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{games, games_mut, last_game_index, PREFIX_LAST_GAME_INDEX};
+use crate::state::{
+    games, games_mut, last_game_index, last_game_index_mut, PREFIX_LAST_GAME_INDEX,
+};
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
     CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult,
-    Order, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage, WasmMsg,
-    KV,
+    Order, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage, WasmMsg, KV,
 };
 use std::convert::TryInto;
 
@@ -19,6 +20,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    last_game_index_mut(&mut deps.storage).save(&GameId::default())?;
     Ok(InitResponse::default())
 }
 
@@ -71,7 +73,25 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
 ) -> ContractResult<HandleResponse> {
     // check whether nft supports base bet
 
+    // check whether dao member
+
+    let host_player_address = deps.api.canonical_address(&env.message.sender)?;
+
+    // ensure enough coins provided
     ensure_has_coins_for_game(&env, &base_bet)?;
+
+    let game_id = query_last_game_id(&deps)?;
+
+    let game = GameDetails::new(host_player_address, nft_id, base_bet);
+
+    // save newly initialized game
+    games_mut(&mut deps.storage).save(&game_id.to_be_bytes(), &game)?;
+
+    // increment game index
+    last_game_index_mut(&mut deps.storage).update(|mut game_id| {
+        game_id += 1;
+        Ok(game_id)
+    })?;
 
     Ok(HandleResponse::default())
 }
@@ -84,6 +104,8 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
     // check whether nft supports base_bet
+
+    // check whether dao member
 
     // ensure game exists
     let game = query_game(deps, game_id)?;
@@ -116,7 +138,7 @@ fn query_game<S: Storage, A: Api, Q: Querier>(
 }
 
 // returns last game id
-fn query_last_game_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<u64> {
+fn query_last_game_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<GameId> {
     last_game_index(&deps.storage).load()
 }
 
