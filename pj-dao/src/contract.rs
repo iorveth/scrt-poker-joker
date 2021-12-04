@@ -1,8 +1,9 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, GameDetails, GameStatus};
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, NftInitMsg, PostInitCallback, QueryMsg};
 use crate::state::{
-    games, games_mut, last_game_index, last_game_index_mut, PREFIX_LAST_GAME_INDEX,
+    games, games_mut, last_game_index, last_game_index_mut, nft_address, nft_address_mut,
+    nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
@@ -49,6 +50,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> ContractResult<HandleResponse> {
     match msg {
+        HandleMsg::CreateNFTContract { code_id } => create_nft_contract(deps, env, code_id),
+        HandleMsg::StoreNFTContract {} => store_nft_contract_addr(deps, env),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
@@ -62,6 +65,50 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::Roll { game_id } => unimplemented!(),
         HandleMsg::ReRoll { game_id, dices } => unimplemented!(),
     }
+}
+
+pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+) -> ContractResult<HandleResponse> {
+    nft_address_mut(&mut deps.storage).save(&env.message.sender)?;
+    Ok(HandleResponse::default())
+}
+
+pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
+    _deps: &mut Extern<S, A, Q>,
+    env: Env,
+    code_id: u64,
+) -> ContractResult<HandleResponse> {
+    let store_addr_msg = HandleMsg::StoreNFTContract {};
+    let post_init_callback = PostInitCallback {
+        msg: to_binary(&store_addr_msg)?,
+        contract_address: env.contract.address.clone(),
+        code_hash: env.contract_code_hash.clone(),
+        send: vec![],
+    };
+    let nft_instantiate_msg = NftInitMsg {
+        name: "PokerJokerNFT".into(),
+        symbol: "PJX".into(),
+        admin: Some(env.contract.address),
+        entropy: "HACKATOM IV".into(),
+        royalty_info: None,
+        config: None,
+        post_init_callback: Some(post_init_callback),
+    };
+    let instantiate_msg = CosmosMsg::Wasm(WasmMsg::Instantiate {
+        code_id,
+        send: vec![],
+        callback_code_hash: env.contract_code_hash,
+        msg: to_binary(&nft_instantiate_msg)?,
+        label: "PJDAO-NFT".into(),
+    });
+
+    Ok(HandleResponse {
+        messages: vec![instantiate_msg],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
@@ -129,6 +176,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::Game { game_id } => to_binary(&query_game(deps, game_id)?),
         QueryMsg::GamesByStatus { status } => to_binary(&query_games_by_status(deps, status)?),
+        QueryMsg::NftAddress {} => to_binary(&query_nft_address(deps)?),
     }
 }
 
@@ -143,6 +191,12 @@ fn query_game<S: Storage, A: Api, Q: Querier>(
 // returns last game id
 fn query_last_game_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<GameId> {
     last_game_index(&deps.storage).load()
+}
+
+fn query_nft_address<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<HumanAddr> {
+    nft_address(&deps.storage).load()
 }
 
 // returns a vector of [u8] game keys and their details
@@ -166,7 +220,9 @@ fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
 pub fn ensure_has_coins_for_game(env: &Env, base_bet: &Coin) -> ContractResult<()> {
     // should be at least 10 x base_bet
     if !has_coins(&env.message.sent_funds, &locked_per_player(base_bet)) {
-        Err(ContractError::NotEnoughTokensForTheGame {})
+        Err(StdError::generic_err(
+            ContractError::NotEnoughTokensForTheGame {}.to_string(),
+        ))
     } else {
         Ok(())
     }

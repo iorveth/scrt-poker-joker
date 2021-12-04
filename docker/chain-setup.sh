@@ -51,15 +51,10 @@ then
   perl -i -pe 's/"stake"/ "uscrt"/g' ~/.secretd/config/genesis.json
   perl -i -pe 's/"172800000000000"/"90000000000"/g' ~/.secretd/config/genesis.json # voting period 2 days -> 90 seconds
 
-  secretd keys add a
+ secretd keys add a
   secretd keys add b
   secretd keys add c
   secretd keys add d
-
-  secretd add-genesis-account "$(secretd keys show -a a)" 1000000000000000000uscrt
-  secretd add-genesis-account "$(secretd keys show -a b)" 1000000000000000000uscrt
-#  secretd add-genesis-account "$(secretd keys show -a c)" 1000000000000000000uscrt
-#  secretd add-genesis-account "$(secretd keys show -a d)" 1000000000000000000uscrt
 
   secretd add-genesis-account $ADMIN_ADDR 200000000uscrt
   secretd add-genesis-account $PLAYER1_ADDR 200000uscrt
@@ -72,6 +67,11 @@ then
   secretd add-genesis-account $PLAYER8_ADDR 200000uscrt
   secretd add-genesis-account $PLAYER9_ADDR 200000uscrt
   secretd add-genesis-account $PLAYER10_ADDR 200000uscrt
+  secretd add-genesis-account "$(secretd keys show -a a)" 1000000000000000000uscrt
+  secretd add-genesis-account "$(secretd keys show -a b)" 1000000000000000000uscrt
+#  secretd add-genesis-account "$(secretd keys show -a c)" 1000000000000000000uscrt
+#  secretd add-genesis-account "$(secretd keys show -a d)" 1000000000000000000uscrt
+
 
   secretd gentx a 1000000uscrt --chain-id "$chain_id"
   secretd gentx b 1000000uscrt --chain-id "$chain_id"
@@ -92,4 +92,4 @@ lcp --proxyUrl http://localhost:1317 --port 1337 --proxyPartial '' &
 # sleep infinity
 source /opt/sgxsdk/environment && RUST_BACKTRACE=1 secretd start --rpc.laddr tcp://0.0.0.0:26657 --bootstrap &
 
-gunicorn --bind 0.0.0.0:5000 svc
+gunicorn --bind 0.0.0.0:5000 svc 

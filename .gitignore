@@ -22,3 +22,8 @@
 
 # js
 **/node_modules
+
+# secret network
+.secretd
+.sgx_secrets
+*.der

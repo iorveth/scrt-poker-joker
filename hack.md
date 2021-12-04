@@ -8,8 +8,9 @@ Pulling and setting the submodule
 
 Run the local node:
 
-1. make sure you have `local-node-setup.sh` and `docker/chain-setup.sh` as executables
+1. make sure you have `local-node-setup.sh`, `store-instantiate-contracts.sh` and `docker/*.sh` as executables
 1. run `./local-node-setup.sh `
+1. run `./store-instantiate-contracts.sh`
 
 This will provide you with Admin and 10 players with chain balance in uscrt
 
@@ -61,11 +62,41 @@ This will provide you with Admin and 10 players with chain balance in uscrt
 1. (optional) manually provide collateral (nodejs script?)
 1. Player 9 starts game again -> success
 1. Player 1 arrives on landing page
+
    1. Connect to wallet
-   1. Query: Sees active games (the one with Player 9)
-   1. Query: Sees own NFTs
+   1. Game Query: Sees active games (the one with Player 9)
+   1. NFT Query: Sees owned NFTs of wallet. use `tokens` query to get a list of token_ids then get each token's metadata via `NftInfo` query
+
+   ```rust
+    Tokens {
+        owner: HumanAddr,
+        /// optional address of the querier if different from the owner
+        viewer: Option<HumanAddr>,
+        /// optional viewing key
+        viewing_key: Option<String>,
+        /// paginate by providing the last token_id received in the previous query
+        start_after: Option<String>,
+        /// optional number of token ids to display
+        limit: Option<u32>,
+    },
+   NftInfo { token_id: String },
+   ```
+
+   The `NftInfo` returned is in the form of:
+
+   ```rust
+    NftInfo {
+        token_uri: Option<String>,
+        extension: Option<Extension>,
+    },
+   ```
+
+   - using the `NftInfo.extensions.description` as the `xp`
+   - using the `NftInfo.extension.attributes` as the colour displays
+
    1. joins player 9 with `join` game with a selected dice set
    1. DAO tx() -> `joinGame(nft_id)` -> call back: `Success (game_id)` -> redirect to game page
+
 1. Player 1 and Player 9 roll dice - button
    1. DAO tx() -> `roll(game_id)` -> call back: `dice outcome {}`
    1. Query: display dice outcome to both parties
