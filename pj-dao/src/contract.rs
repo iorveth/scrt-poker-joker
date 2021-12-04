@@ -116,6 +116,9 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     // ensure game status is set to pending
     game.status.ensure_is_pending()?;
 
+    // save newly initialized game
+    games_mut(&mut deps.storage).save(&game_id.to_be_bytes(), &game)?;
+    
     Ok(HandleResponse::default())
 }
 
