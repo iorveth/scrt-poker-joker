@@ -7,8 +7,8 @@ use crate::game::GameDetails;
 
 use cosmwasm_std::{Api, BlockInfo, CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage};
 use cosmwasm_storage::{
-    bucket, bucket_read, singleton, Bucket, PrefixedStorage, ReadonlyBucket,
-    ReadonlyPrefixedStorage, Singleton,
+    bucket, bucket_read, singleton, singleton_read, Bucket, PrefixedStorage, ReadonlyBucket,
+    ReadonlyPrefixedStorage, Singleton, ReadonlySingleton
 };
 
 use secret_toolkit::{
@@ -32,7 +32,12 @@ pub fn games<'a, S: Storage>(storage: &'a S) -> ReadonlyBucket<'a, S, GameDetail
     bucket_read(PREFIX_GAMES, storage)
 }
 
-// retrieve last game index
-pub fn last_game_index<'a, S: Storage>(storage: &'a mut S) -> Singleton<'a, S, GameId> {
+// last game index
+pub fn last_game_index_mut<'a, S: Storage>(storage: &'a mut S) -> Singleton<'a, S, GameId> {
     singleton(storage, PREFIX_LAST_GAME_INDEX)
+}
+
+// readonly last game index
+pub fn last_game_index<'a, S: Storage>(storage: &'a S) -> ReadonlySingleton<'a, S, GameId> {
+    singleton_read(storage, PREFIX_LAST_GAME_INDEX)
 }

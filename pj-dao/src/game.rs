@@ -1,5 +1,4 @@
 use crate::error::{ContractError, ContractResult};
-use crate::game::NUM_OF_DICES;
 use cosmwasm_std::{coin, Coin, HumanAddr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

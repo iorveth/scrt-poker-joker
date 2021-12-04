@@ -5,7 +5,7 @@ use crate::state::{games, games_mut, last_game_index, PREFIX_LAST_GAME_INDEX};
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
     CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult,
-    Order, Querier, QueryResult, ReadonlyStorage, Response, StdError, StdResult, Storage, WasmMsg,
+    Order, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage, WasmMsg,
     KV,
 };
 use std::convert::TryInto;
@@ -45,7 +45,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> ContractResult<Response> {
+) -> ContractResult<HandleResponse> {
     match msg {
         HandleMsg::CreateNewGameRoom {
             nft_id,
@@ -68,13 +68,12 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     nft_id: String,
     base_bet: Coin,
     secret: Secret,
-) -> ContractResult<Response> {
+) -> ContractResult<HandleResponse> {
     // check whether nft supports base bet
 
     ensure_has_coins_for_game(&env, &base_bet)?;
 
-    let res = Response::new().add_attribute("room created", format!("Room id: {}", id));
-    Ok(res)
+    Ok(HandleResponse::default())
 }
 
 pub fn join_game<S: Storage, A: Api, Q: Querier>(
@@ -83,7 +82,7 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     nft_id: String,
     game_id: GameId,
     secret: Secret,
-) -> ContractResult<Response> {
+) -> ContractResult<HandleResponse> {
     // check whether nft supports base_bet
 
     // ensure game exists
@@ -95,8 +94,7 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     // ensure game status is set to pending
     game.status.ensure_is_pending()?;
 
-    let res = Response::new().add_attribute("action", format!("Room id: {}", id));
-    Ok(res)
+    Ok(HandleResponse::default())
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -105,7 +103,6 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::Game { game_id } => to_binary(&query_game(deps, game_id)?),
-        // returns vector of ()
         QueryMsg::GamesByStatus { status } => to_binary(&query_games_by_status(deps, status)?),
     }
 }
@@ -123,6 +120,7 @@ fn query_last_game_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) ->
     last_game_index(&deps.storage).load()
 }
 
+// returns a vector of [u8] game keys and their details
 fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     status: GameStatus,
