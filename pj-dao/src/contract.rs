@@ -1,5 +1,5 @@
 use crate::error::{ContractError, ContractResult};
-use crate::game::{locked_per_player, GameDetails, GameStatus};
+use crate::game::{locked_per_player, Game, GameDetails, GameStatus};
 use crate::msg::{HandleMsg, InitMsg, NftHandleMsg, NftInitMsg, PostInitCallback, QueryMsg};
 use crate::state::{
     load_game, load_last_game_index, nft_address, nft_code_hash, nft_code_id, save_game,
@@ -9,7 +9,8 @@ use crate::state::{
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
     CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult,
-    Order, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage, WasmMsg, KV,
+    LogAttribute, Order, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage,
+    WasmMsg, KV,
 };
 use std::convert::TryInto;
 
@@ -69,7 +70,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             game_id,
             secret,
         } => join_game(deps, env, nft_id, game_id, secret),
-        HandleMsg::Roll { game_id } => unimplemented!(),
+        HandleMsg::Roll { game_id } => roll(deps, env, game_id),
         HandleMsg::ReRoll { game_id, dices } => unimplemented!(),
     }
 }
@@ -164,15 +165,21 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
 
     let game_id = load_last_game_index(&deps.storage)?;
 
-    let game = GameDetails::new(host_player_address, nft_id, base_bet);
+    // create new game with provided host player secret
+    let game = Game::new(host_player_address, nft_id, base_bet);
+    let game_details = GameDetails::new(game, secret.to_be_bytes());
 
     // save newly initialized game
-    save_game(&mut deps.storage, game_id, &game)?;
+    save_game(&mut deps.storage, game_id, &game_details)?;
 
     // increment game index
     save_last_game_index(&mut deps.storage, &(game_id + 1))?;
 
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn join_game<S: Storage, A: Api, Q: Querier>(
@@ -182,20 +189,56 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     game_id: GameId,
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
+    let joined_player_address = deps.api.canonical_address(&env.message.sender)?;
+
     // check whether nft supports base_bet
 
     // check whether dao member
 
     // ensure game exists
-    let game = query_game(deps, game_id)?;
+    let mut game_details = load_game(&deps.storage, game_id)?;
 
     // ensure enough coins provided
-    ensure_has_coins_for_game(&env, &game.base_bet)?;
+    ensure_has_coins_for_game(&env, &game_details.game.base_bet)?;
 
     // ensure game status is set to pending
-    game.status.ensure_is_pending()?;
+    game_details.ensure_is_pending()?;
 
-    Ok(HandleResponse::default())
+    // join the game
+    game_details.join(joined_player_address, nft_id, secret.to_be_bytes());
+
+    // save update game state
+    save_game(&mut deps.storage, game_id, &game_details)?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
+}
+
+pub fn roll<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    game_id: GameId,
+) -> ContractResult<HandleResponse> {
+    let joined_player_address = deps.api.canonical_address(&env.message.sender)?;
+
+    // ensure game exists
+    let mut game_details = load_game(&deps.storage, game_id)?;
+
+    // ensure game status is set to started
+    game_details.ensure_is_started()?;
+
+    // Ensure given account can make a roll in a game
+    game_details.ensure_can_make_a_roll(joined_player_address)?;
+
+    // check whether player can roll
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -213,8 +256,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 fn query_game<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     game_id: GameId,
-) -> StdResult<GameDetails> {
-    load_game(&deps.storage, game_id)
+) -> StdResult<Game> {
+    load_game(&deps.storage, game_id).map(|game_details| Game::from(game_details))
 }
 
 fn query_nft_address<S: Storage, A: Api, Q: Querier>(
@@ -227,11 +270,11 @@ fn query_nft_address<S: Storage, A: Api, Q: Querier>(
 fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     status: GameStatus,
-) -> StdResult<Vec<(GameId, GameDetails)>> {
+) -> StdResult<Vec<(GameId, Game)>> {
     (INIT_INDEX..=load_last_game_index(&deps.storage)?)
         .into_iter()
         .map(|i| match load_game(&deps.storage, i) {
-            Ok(game) => Ok((i, game)),
+            Ok(game) => Ok((i, Game::from(game))),
             Err(e) => Err(e),
         })
         .filter(|game_entry| {

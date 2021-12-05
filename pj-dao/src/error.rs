@@ -16,4 +16,6 @@ pub enum ContractError {
     GameNotInStartedStatus {},
     #[error("GameNotInRerollStatus")]
     GameNotInRerollStatus {},
+    #[error("GivenAccountCannotMakeARoll")]
+    GivenAccountCannotMakeARoll {},
 }
