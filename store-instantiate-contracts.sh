@@ -12,4 +12,4 @@ gzip -d contract.wasm.gz
 cd ../pj-nft/
 gzip -d contract.wasm.gz
 cd ../js-deploy
-node deploy.js
+node index.js deploy 
