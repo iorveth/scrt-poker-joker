@@ -78,25 +78,33 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    _with_nft: Option<String>,
+    with_nft: Option<String>,
 ) -> ContractResult<HandleResponse> {
     // TODO: do we need to mint for this user?
     // TODO: charge user?
-    let mint_dice_msg = NftHandleMsg::MintDiceNft {
-        owner: Some(env.message.sender.clone()),
-        private_metadata: None,
-    };
+    // has user joined?
+    let mut response_msg: Vec<CosmosMsg> = vec![];
 
-    let contract_addr = nft_address(&deps.storage)?;
-    let callback_code_hash = nft_code_hash(&deps.storage)?;
-    let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr,
-        callback_code_hash,
-        msg: to_binary(&mint_dice_msg)?,
-        send: vec![],
-    });
+    if let Some(_nft_id) = with_nft {
+        // check this belongs to the user
+    } else {
+        let mint_dice_msg = NftHandleMsg::MintDiceNft {
+            owner: Some(env.message.sender.clone()),
+            private_metadata: None,
+        };
+
+        let contract_addr = nft_address(&deps.storage)?;
+        let callback_code_hash = nft_code_hash(&deps.storage)?;
+        let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr,
+            callback_code_hash,
+            msg: to_binary(&mint_dice_msg)?,
+            send: vec![],
+        });
+        response_msg.push(mint_msg);
+    }
     Ok(HandleResponse {
-        messages: vec![mint_msg],
+        messages: response_msg,
         log: vec![log("joined", env.message.sender)],
         data: None,
     })

@@ -1,9 +1,0 @@
-{
-  "name": "js-deploy",
-  "version": "1.0.0",
-  "license": "MIT",
-  "dependencies": {
-    "secretjs": "^0.17.0",
-    "dotenv": "^10.0.0"
-  }
-}
