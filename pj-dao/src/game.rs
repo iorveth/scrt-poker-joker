@@ -1,15 +1,28 @@
+use crate::contract::GameId;
 use crate::error::{ContractError, ContractResult};
 use cosmwasm_std::{coin, CanonicalAddr, Coin, StdError};
+use rand::Rng;
+use rand_chacha::ChaChaRng;
+use rand_core::{RngCore, SeedableRng};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 
+// total roll rounds
 const TOTAL_ROUNDS: usize = 2;
 
 // Max num of dices each player rolls in the game round
 pub const NUM_OF_DICES: usize = 5;
 
+pub const MIN_DICE_NUMBER: u8 = 1;
+pub const MAX_DICE_NUMBER: u8 = 6;
+
 // (5 dices) x 2 rounds
 pub type Rolls = [Option<[u8; NUM_OF_DICES]>; TOTAL_ROUNDS];
+
+// Secret bytes provided by the player
+pub type Secret = [u8; 8];
 
 // An amount locked per player for a game
 pub fn locked_per_player(base_bet: &Coin) -> Coin {
@@ -19,10 +32,213 @@ pub fn locked_per_player(base_bet: &Coin) -> Coin {
     )
 }
 
+/// Calculate total player points
+pub fn calculate_player_total_points(roll: [u8; NUM_OF_DICES]) -> u8 {
+    // results table [number of equal dices], where index is a number
+
+    // 0 - 1
+    // 1 - 2
+    // 2 - 3
+    // 3 - 4
+    // 4 - 5
+    // 5 - 6
+
+    let mut results: [u8; MAX_DICE_NUMBER] = [0; MAX_DICE_NUMBER];
+
+    for i in 0..MAX_DICE_NUMBER {
+        for dice in roll {
+            if dice == (i + 1) {
+                results[i as usize] += 1;
+            }
+        }
+    }
+
+    // 5 points: 5 of 1s
+    if results.iter().any(|item| *item == 5) {
+        5
+
+    // 4 points: straight (1-5)
+    } else if results.iter().all(|item| *item == 1) {
+        4
+
+    // 4 points: 3 of a kind + 1 pair
+    } else if results.iter().any(|item| *item == 3) && results.iter().any(|item| *item == 2) {
+        4
+
+    // 3 points: 3 of a kind
+    } else if results.iter().any(|item| *item == 3) {
+        3
+
+    // 2 points: 2 pairs
+    } else if results.iter().filter(|item| **item == 2).count() == 2 {
+        2
+
+    // 1 point: 1 pair (it seems that we can't have less)
+    } else {
+        1
+    }
+}
+
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct GameDetails {
+    // information about the game
+    pub game: Game,
+    // secret bytes provided by host player
+    pub host_player_secret: Secret,
+    // secret bytes provided by joined player
+    pub joined_player_secret: Secret,
+}
+
+impl From<GameDetails> for Game {
+    fn from(game_details: GameDetails) -> Self {
+        game_details.game
+    }
+}
+
+impl GameDetails {
+    pub fn new(game: Game, host_player_secret: Secret) -> GameDetails {
+        Self {
+            game,
+            host_player_secret,
+            joined_player_secret: Secret::default(),
+        }
+    }
+
+    /// Join the game
+    pub fn join(
+        &mut self,
+        joined_player_address: CanonicalAddr,
+        joined_player_nft_id: String,
+        joined_player_secret: Secret,
+    ) {
+        // add coins sent by a second player
+        self.game.total_pool = Coin::new(
+            self.game.total_pool.amount.u128() * 2,
+            &self.game.total_pool.denom,
+        );
+
+        self.game.joined_player_address = joined_player_address;
+        self.game.joined_player_nft_id = joined_player_nft_id;
+        self.joined_player_secret = joined_player_secret;
+
+        // game started
+        self.game.status = GameStatus::Started;
+    }
+
+    /// Roll dices
+    pub fn roll(&mut self, game_id: GameId) {
+        let mut combined_secret = self.host_player_secret.to_vec();
+        combined_secret.extend(self.joined_player_secret);
+        combined_secret.extend(&game_id.to_be_bytes()); // game counter
+
+        let seed: [u8; 32] = Sha256::digest(&combined_secret).into();
+
+        let mut rng = ChaChaRng::from_seed(seed);
+
+        let mut roll: [u8; NUM_OF_DICES] = [0; NUM_OF_DICES];
+
+        // Generate a random value in the range [low, high).
+        // I suppose we need integer values in the range [1, 6]
+        for dice in &mut roll {
+            *dice = rng.gen_range(MIN_DICE_NUMBER, MAX_DICE_NUMBER + 1);
+        }
+
+        // Change roll turn value
+        match self.game.roll_turn {
+            Player::Host => {
+                self.game.host_player_rolls[0] = Some(roll);
+                self.game.host_player_total_points = calculate_player_total_points(roll);
+                self.game.roll_turn = Player::Joined;
+            }
+            Player::Joined => {
+                self.game.joined_player_rolls[0] = Some(roll);
+                self.game.joined_player_total_points = calculate_player_total_points(roll);
+                self.game.roll_turn = Player::Host;
+            }
+        }
+
+        // Move to the reroll stage
+        if self.game.host_player_rolls[0].is_some() && self.game.joined_player_rolls[0].is_some() {
+            self.game.status = GameStatus::ReRoll;
+        }
+    }
+
+    /// Reroll chosen dices
+    /// false - do not reroll
+    /// true - reroll
+    pub fn reroll(&mut self, dices: [bool; NUM_OF_DICES]) {
+        match self.game.roll_turn {
+            Player::Host => {
+                self.game.roll_turn = Player::Joined;
+            }
+            Player::Joined => {
+                self.game.roll_turn = Player::Host;
+            }
+        }
+    }
+
+    /// Ensure GameStatus is set to Pending
+    pub fn ensure_is_pending(&self) -> ContractResult<()> {
+        if self.game.status.ne(&GameStatus::Pending) {
+            Err(StdError::generic_err(
+                ContractError::GameNotInPendingStatus {}.to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Ensure GameStatus is set to Started
+    pub fn ensure_is_started(&self) -> ContractResult<()> {
+        if self.game.status.ne(&GameStatus::Started) {
+            Err(StdError::generic_err(
+                ContractError::GameNotInStartedStatus {}.to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Ensure GameStatus is set to Reroll
+    pub fn ensure_is_reroll(&self) -> ContractResult<()> {
+        if self.game.status.ne(&GameStatus::ReRoll) {
+            Err(StdError::generic_err(
+                ContractError::GameNotInRerollStatus {}.to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Ensure given account can make a roll in the game
+    pub fn ensure_can_roll(&self, address: CanonicalAddr) -> ContractResult<()> {
+        let can_roll = match self.game.roll_turn {
+            Player::Host => self.game.host_player_address == address,
+            Player::Joined => self.game.joined_player_address == address,
+        };
+
+        if !can_roll {
+            Err(StdError::generic_err(
+                ContractError::GivenAccountCannotMakeARoll {}.to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Whether the game is finished
+    pub fn is_finished(&self) -> bool {
+        // check whether both players rolled a second time
+        self.game.host_player_rolls[1].is_some() && self.game.joined_player_rolls[1].is_some()
+    }
+}
+
+// We define a custom struct for each query response
+#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct Game {
     pub status: GameStatus,
     // whether the game is shielded
     pub shielded: bool,
@@ -44,9 +260,12 @@ pub struct GameDetails {
     pub host_player_total_points: u8,
     // total points amount scored throughout the game by joined player
     pub joined_player_total_points: u8,
+
+    // who rolls next (default initial player is set to host)
+    pub roll_turn: Player,
 }
 
-impl GameDetails {
+impl Game {
     pub fn new(
         host_player_address: CanonicalAddr,
         host_player_nft_id: String,
@@ -59,37 +278,7 @@ impl GameDetails {
             host_player_nft_id,
             total_pool: locked_per_player(&base_bet),
             base_bet,
-            ..GameDetails::default()
-        }
-    }
-
-    /// Join the game
-    pub fn join(&mut self, joined_player_address: CanonicalAddr, joined_player_nft_id: String) {
-        self.joined_player_address = joined_player_address;
-        self.joined_player_nft_id = joined_player_nft_id;
-
-        // game started
-        self.status = GameStatus::Started;
-    }
-
-    /// Roll dices
-    pub fn roll(&mut self, player: Player) {
-        match player {
-            Player::Host => {}
-            Player::Joined => {}
-        }
-
-        // game started
-        self.status = GameStatus::ReRoll;
-    }
-
-    /// Reroll chosen dices
-    /// false - do not reroll
-    /// true - reroll
-    pub fn reroll(&mut self, player: Player, dices: [bool; 5]) {
-        match player {
-            Player::Host => {}
-            Player::Joined => {}
+            ..Game::default()
         }
     }
 }
@@ -109,43 +298,14 @@ pub enum Player {
     Joined,
 }
 
-impl Default for GameStatus {
+impl Default for Player {
     fn default() -> Self {
-        Self::Pending
+        Self::Host
     }
 }
 
-impl GameStatus {
-    /// Ensure GameStatus is set to Pending
-    pub fn ensure_is_pending(&self) -> ContractResult<()> {
-        if self.ne(&GameStatus::Pending) {
-            Err(StdError::generic_err(
-                ContractError::GameNotInPendingStatus {}.to_string(),
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Ensure GameStatus is set to Started
-    pub fn ensure_is_started(&self) -> ContractResult<()> {
-        if self.ne(&GameStatus::Started) {
-            Err(StdError::generic_err(
-                ContractError::GameNotInStartedStatus {}.to_string(),
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Ensure GameStatus is set to Reroll
-    pub fn ensure_is_reroll(&self) -> ContractResult<()> {
-        if self.ne(&GameStatus::ReRoll) {
-            Err(StdError::generic_err(
-                ContractError::GameNotInRerollStatus {}.to_string(),
-            ))
-        } else {
-            Ok(())
-        }
+impl Default for GameStatus {
+    fn default() -> Self {
+        Self::Pending
     }
 }

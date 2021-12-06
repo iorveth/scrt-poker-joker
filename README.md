@@ -15,7 +15,7 @@ The owner of the dice NFT, depending on the attributes of the NFT, may have diff
 
 - the total number of dice per player is 5
 - there is a base bet value per die in the game (set by the initiator, more on this later)
-- the initial total stake is number of players x base bet x 5 (number of dice per player)
+- the initial total stake is number of players x base bet x 5 x 2 (number of dice per player x 2 rounds )
 
 ### Play
 
