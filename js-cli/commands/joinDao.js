@@ -27,7 +27,7 @@ const joinDao = async () => {
 
 const daoAddr = conf.get('daoAddr');
     console.log("dao address: ", daoAddr)
-  const joinDaoMsg = { join_dao: { nft_id: "" } };
+  const joinDaoMsg = { join_dao: { nft: "" } };
   let r = await player1Client.execute(daoAddr, joinDaoMsg);
   console.log("joined Dao and mint: ", JSON.stringify(r));
   const wasmEvent = r.logs[0].events.pop()
