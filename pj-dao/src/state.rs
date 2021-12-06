@@ -85,13 +85,21 @@ pub fn get_game_key(game_id: GameId) -> Vec<u8> {
 
 pub fn save_joiner<S: Storage>(
     storage: &mut S,
+<<<<<<< HEAD
     joiner: &CanonicalAddr,
+=======
+    joiner: CanonicalAddr,
+>>>>>>> 5a157d0 (wip)
     viewing_key: String,
 ) -> StdResult<()> {
     save(storage, &joiner.0 .0, &viewing_key)
 }
 
+<<<<<<< HEAD
 pub fn load_joiner<S: Storage>(storage: &S, joiner: &CanonicalAddr) -> StdResult<Option<String>> {
+=======
+pub fn load_joiner<S: Storage>(storage: &S, joiner: CanonicalAddr) -> StdResult<Option<String>> {
+>>>>>>> 5a157d0 (wip)
     may_load(storage, &joiner.0 .0)
 }
 

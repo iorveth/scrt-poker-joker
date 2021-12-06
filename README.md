@@ -14,6 +14,7 @@ The owner of the dice NFT, depending on the attributes of the NFT, may have diff
 As fun and simple Scrt Poker Joker strive to be, the design of this game was built on a few principles that we value:
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 1. _Aligning NFT value with utility_: By linking the dice NFTs `xp` level (earned by playing) to the `base bet` amount,
    we providing a correlation between the NFT itself and the potential winnings (via [xp-table]) of an NFT in the game.
    This is important as it captures the skills of the previous owners of the NFT and encourages future engagement with the game.
@@ -26,6 +27,14 @@ As fun and simple Scrt Poker Joker strive to be, the design of this game was bui
 1. _Easy onboarding for adoption_: We implemented collateralisation of Dice NFT so that first time users can play the game without specifically needing needing network gas (with the incoming [feegrant] in the cosmos-sdk and other gas station implmentations) or Game DAO tokens.
 1. _Decentralised governance_: In this MVP, the DAO contract is currently responsible to minting and collateralisation of the NFTs. As the game develops, such decisions, along with the scoring table will be voted by the gamers themselves.
 >>>>>>> e1fe8c7 (wip: pulling new dao game pr)
+=======
+1. _Aligning NFT value with utility_: By linking the dice NFTs `xp` level (earned by playing) to the `base bet` amount,
+   we providing a correlation between the NFT itself and the potential winnings (via [xp-table]) of an NFT in the game.
+   This is important as it captures the skills of the previous owners of the NFT and encourages future engagement with the game.
+1. _Easy onboarding for adoption_: We implemented collateralisation of Dice NFT so that first time users can play the game without specifically needing PJ Dao token (to be implemented) or network gas (with the incoming [feegrant] in the cosmos-sdk and other gas station implmentations).
+1. _Decentralised governance_: In this MVP, the DAO contract is currently responsible to minting and collateralisation of the NFTs.
+   As the game develops, such decisions, along with the scoring table will be voted by the gamers themselves.
+>>>>>>> 5a157d0 (wip)
 
 [feegrant]: https://github.com/cosmos/cosmos-sdk/blob/v0.44.5/CHANGELOG.md#v0430---2021-08-10
 
@@ -77,12 +86,16 @@ In order to align the value of the Dice NFT with their utility, we have initiall
 ### XP Table
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 5a157d0 (wip)
 |     Point | Base Bet | Access to Shielded Game |
 | --------: | -------: | ----------------------: |
 |     < 100 |   1 Scrt |                      No |
 | 100 < 200 |   2 Scrt |                      No |
 | 200 < 400 |   4 Scrt |                     Yes |
 |     400 + |   8 Scrt |                     Yes |
+<<<<<<< HEAD
 =======
 | Point     | Base Bet | Access to Shielded Game |
 | --------- | -------- | ----------------------- |
@@ -95,6 +108,11 @@ In order to align the value of the Dice NFT with their utility, we have initiall
 ### Message flow diagram
 
 <<<<<<< HEAD
+=======
+
+### Message flow diagram
+
+>>>>>>> 5a157d0 (wip)
 // TODO
 
 =======
@@ -107,7 +125,12 @@ With the Dice NFT, owners can take part in the governance of the game.
 
 - loser loses points
 <<<<<<< HEAD
+<<<<<<< HEAD
 - make SNIP721 specs into a lib
 - Viewing key is not specific to the view, this is very much capbility based but we must be able to revoke capability for some view and not others
 =======
 >>>>>>> e1fe8c7 (wip: pulling new dao game pr)
+=======
+- make SNIP721 specs into a lib
+- Viewing key is not specific to the view, this is very much capbility based but we must be able to revoke capability for some view and not others
+>>>>>>> 5a157d0 (wip)
