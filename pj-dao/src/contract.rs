@@ -260,10 +260,10 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
     // ensure game status is set to started
     game_details.ensure_is_started()?;
 
-    // Ensure given account can make a roll in a game
+    // Ensure given account can make a reroll in a game
     game_details.ensure_can_roll(joined_player_address)?;
 
-    game_details.reroll(dices);
+    game_details.reroll(game_id, dices);
 
     // Game storage removal
     // if game_details.is_finished() {
