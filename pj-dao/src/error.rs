@@ -18,4 +18,6 @@ pub enum ContractError {
     GameNotInRerollStatus {},
     #[error("GivenAccountCannotMakeARoll")]
     GivenAccountCannotMakeARoll {},
+    #[error("AlreadyJoined")]
+    AlreadyJoined {},
 }

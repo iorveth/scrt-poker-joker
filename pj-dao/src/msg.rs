@@ -19,9 +19,17 @@ pub struct InitMsg {
 pub enum NftHandleMsg {
     MintDiceNft {
         owner: Option<HumanAddr>,
+        /// viewing key set by the dao for this dice nft
+        key: String,
         /// optional public metadata that can be seen by everyone
         private_metadata: Option<Metadata>,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct JoinNftDetails {
+    pub id: String,
+    pub viewing_key: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -47,7 +55,7 @@ pub enum HandleMsg {
         dices: [bool; NUM_OF_DICES],
     },
     JoinDao {
-        nft_id: Option<String>,
+        nft: Option<JoinNftDetails>,
     },
 }
 
@@ -254,4 +262,50 @@ pub struct Authentication {
     pub key: Option<String>,
     /// username used in basic authentication
     pub user: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+pub enum Expiration {
+    /// expires at this block height
+    AtHeight(u64),
+    /// expires at the time in seconds since 01/01/1970
+    AtTime(u64),
+    /// never expires
+    Never,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+pub struct Cw721Approval {
+    pub spender: HumanAddr,
+    pub expires: Expiration,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum NftQueryAnswer {
+    OwnerOf {
+        owner: HumanAddr,
+        approvals: Vec<Cw721Approval>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NftQueryMsg {
+    OwnerOf {
+        token_id: String,
+        /// optional address and key requesting to view the token owner
+        viewer: Option<ViewerInfo>,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ViewerInfo {
+    /// querying address
+    pub address: HumanAddr,
+    /// authentication key string
+    pub viewing_key: String,
 }
