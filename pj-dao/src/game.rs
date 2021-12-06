@@ -45,9 +45,9 @@ pub fn calculate_player_total_points(roll: [u8; NUM_OF_DICES]) -> u8 {
 
     let mut results: [u8; NUM_OF_DICES] = [0; NUM_OF_DICES];
 
-    for i in MIN_DICE_NUMBER..=MAX_DICE_NUMBER {
+    for i in 0..MAX_DICE_NUMBER {
         for dice in roll {
-            if dice == i {
+            if dice == (i + 1) {
                 results[i as usize] += 1;
             }
         }
