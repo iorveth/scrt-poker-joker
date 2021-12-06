@@ -76,26 +76,32 @@ pub fn nft_code_hash<'a, S: Storage>(storage: &'a S) -> StdResult<String> {
 //     save(storage, PREFIX_NFT_CONTRACT, value)
 // }
 
+// Get game storage key from it's id
+pub fn get_game_key(game_id: GameId) -> Vec<u8> {
+    PREFIX_GAMES
+        .iter()
+        .chain(game_id.to_be_bytes().iter())
+        .copied()
+        .collect()
+}
+
 pub fn save_game<S: Storage>(
     storage: &mut S,
     game_id: GameId,
     value: &GameDetails,
 ) -> StdResult<()> {
-    let key: Vec<u8> = PREFIX_GAMES
-        .iter()
-        .chain(game_id.to_be_bytes().iter())
-        .copied()
-        .collect();
+    let key: Vec<u8> = get_game_key(game_id);
     json_save(storage, &key, value)
 }
 
 pub fn load_game<S: Storage>(storage: &S, game_id: GameId) -> StdResult<GameDetails> {
-    let key: Vec<u8> = PREFIX_GAMES
-        .iter()
-        .chain(game_id.to_be_bytes().iter())
-        .copied()
-        .collect();
+    let key: Vec<u8> = get_game_key(game_id);
     json_load(storage, &key)
+}
+
+pub fn remove_game<S: Storage>(storage: &mut S, game_id: GameId) {
+    let key: Vec<u8> = get_game_key(game_id);
+    remove(storage, &key)
 }
 
 /// Returns StdResult<()> resulting from saving an item to storage

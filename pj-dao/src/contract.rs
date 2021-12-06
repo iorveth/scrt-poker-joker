@@ -1,5 +1,5 @@
 use crate::error::{ContractError, ContractResult};
-use crate::game::{locked_per_player, Game, GameDetails, GameStatus};
+use crate::game::{locked_per_player, Game, GameDetails, GameStatus, NUM_OF_DICES};
 use crate::msg::{HandleMsg, InitMsg, NftHandleMsg, NftInitMsg, PostInitCallback, QueryMsg};
 use crate::state::{
     load_game, load_last_game_index, nft_address, nft_code_hash, nft_code_id, save_game,
@@ -71,7 +71,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             secret,
         } => join_game(deps, env, nft_id, game_id, secret),
         HandleMsg::Roll { game_id } => roll(deps, env, game_id),
-        HandleMsg::ReRoll { game_id, dices } => unimplemented!(),
+        HandleMsg::ReRoll { game_id, dices } => reroll(deps, env, game_id, dices),
     }
 }
 
@@ -207,7 +207,7 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     // join the game
     game_details.join(joined_player_address, nft_id, secret.to_be_bytes());
 
-    // save update game state
+    // save updated game state
     save_game(&mut deps.storage, game_id, &game_details)?;
 
     Ok(HandleResponse {
@@ -230,8 +230,46 @@ pub fn roll<S: Storage, A: Api, Q: Querier>(
     // ensure game status is set to started
     game_details.ensure_is_started()?;
 
+    // Ensure given account can now make a roll in a game
+    game_details.ensure_can_roll(joined_player_address)?;
+
+    game_details.roll(game_id);
+
+    // save updated game state
+    save_game(&mut deps.storage, game_id, &game_details)?;
+
+    // check whether player can roll
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
+}
+
+pub fn reroll<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    game_id: GameId,
+    dices: [bool; NUM_OF_DICES],
+) -> ContractResult<HandleResponse> {
+    let joined_player_address = deps.api.canonical_address(&env.message.sender)?;
+
+    // ensure game exists
+    let mut game_details = load_game(&deps.storage, game_id)?;
+
+    // ensure game status is set to started
+    game_details.ensure_is_started()?;
+
     // Ensure given account can make a roll in a game
-    game_details.ensure_can_make_a_roll(joined_player_address)?;
+    game_details.ensure_can_roll(joined_player_address)?;
+
+    game_details.reroll(dices);
+
+    // Game storage removal
+    // if game_details.is_finished() {
+    //     // remove game after completion
+    //     remove_game(&mut deps.storage, game_id, &game_details)?;
+    // }
 
     // check whether player can roll
     Ok(HandleResponse {
