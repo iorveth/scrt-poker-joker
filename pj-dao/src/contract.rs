@@ -192,6 +192,9 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
 
     // check whether dao member
 
+    // ensure base bet is greater then zero
+    ensure_correct_base_bet(&base_bet)?;
+
     // ensure enough coins provided
     ensure_has_coins_for_game(&env, &base_bet)?;
 
@@ -499,12 +502,24 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-// Check whether given player provided max amount of coins, that can potentially be lost in the game
+/// Check whether given player provided max amount of coins, that can potentially be lost in the game
 pub fn ensure_has_coins_for_game(env: &Env, base_bet: &Coin) -> ContractResult<()> {
     // should be at least 10 x base_bet
     if !has_coins(&env.message.sent_funds, &locked_per_player(base_bet)) {
         Err(StdError::generic_err(
             ContractError::NotEnoughTokensForTheGame {}.to_string(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Ensure base bet is greater then zero
+pub fn ensure_correct_base_bet(base_bet: &Coin) -> ContractResult<()> {
+    // should be ge 0
+    if base_bet.amount.u128() == 0 {
+        Err(StdError::generic_err(
+            ContractError::BaseBetCanNotBeZero {}.to_string(),
         ))
     } else {
         Ok(())
