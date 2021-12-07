@@ -1,5 +1,5 @@
 use crate::game::GameDetails;
-use cosmwasm_std::{Api, Binary, Coin, HumanAddr, StdResult};
+use cosmwasm_std::{Binary, Coin, HumanAddr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -173,6 +173,16 @@ pub enum NftHandleMsg {
         /// optional public metadata that can be seen by everyone
         private_metadata: Option<Metadata>,
     },
+    SetMetadata {
+        /// id of the token whose metadata should be updated
+        token_id: String,
+        /// the optional new public metadata
+        public_metadata: Option<Metadata>,
+        /// the optional new private metadata
+        private_metadata: Option<Metadata>,
+        /// optional message length padding
+        padding: Option<String>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -191,6 +201,10 @@ pub enum NftQueryAnswer {
     TokenList {
         tokens: Vec<String>,
     },
+    NftInfo {
+        token_uri: Option<String>,
+        extension: Option<Extension>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -204,6 +218,8 @@ pub enum NftQueryMsg {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
+    /// displays the public metadata of a token
+    NftInfo { token_id: String },
     /// displays a list of all the tokens belonging to the input owner in which the viewer
     /// has view_owner permission
     Tokens {

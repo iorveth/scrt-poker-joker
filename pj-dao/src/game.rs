@@ -3,11 +3,10 @@ use crate::error::{ContractError, ContractResult};
 use cosmwasm_std::{coin, BankMsg, Coin, CosmosMsg, HumanAddr, StdError};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
-use rand_core::{RngCore, SeedableRng};
+use rand_core::SeedableRng;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 
 // total roll rounds
 const TOTAL_ROUNDS: usize = 2;
@@ -157,7 +156,7 @@ impl GameDetails {
     }
 
     // Determine a winner of the game
-    fn determine_a_winner(&self) -> Option<Player> {
+    pub fn determine_a_winner(&self) -> Option<Player> {
         if self.game.host_player_total_points > self.game.joined_player_total_points {
             Some(Player::Host)
         } else if self.game.host_player_total_points < self.game.joined_player_total_points {
@@ -167,7 +166,11 @@ impl GameDetails {
         }
     }
 
-    pub fn complete_checkout(&self, contract_address: HumanAddr) -> Vec<CosmosMsg> {
+    pub fn complete_checkout(
+        &self,
+        contract_address: HumanAddr,
+        winner: Option<Player>,
+    ) -> Vec<CosmosMsg> {
         let denom = self.game.game_pool.total_stake.denom.to_string();
         let total_stake = self.game.game_pool.total_stake.amount;
         let host_player_pool = self.game.game_pool.host_player_pool.amount;
@@ -192,7 +195,7 @@ impl GameDetails {
             }),
         ];
 
-        match self.determine_a_winner() {
+        match winner {
             Some(Player::Host) => {
                 checkout_messages.push(CosmosMsg::Bank(BankMsg::Send {
                     from_address: contract_address,
