@@ -57,9 +57,8 @@ We strive for the Poker Joker Dice game to be fun and simple, however, our desig
 
 There are two modes for play in Poker Joker, the clear and shielded mode (to be implemented).
 
-- **Clear mode:** each player does their initial roll and the result of that roll can be observed by all the other players in the game
-- **Shielded mode (Coming Soon):** the other players cannot see what the shielded player have rolled but only that they have / have not rerolled.
-  Naturally if a player is using the shielded mode, it is unlikely that an unshielded player will opt in to play.
+- **Clear mode:** Using Secret Network Randomness feature - each player does their initial roll and the result of that roll can be observed by all the other players in the game.
+- **Shielded mode (Coming Soon):** Using Secret Network Privacy feature - the other players cannot see what the shielded player have rolled but only that they have / have not rerolled. Naturally if a player is using the shielded mode, it is unlikely that an unshielded player will opt in to play.
 
 #### Scoring
 
