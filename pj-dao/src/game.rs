@@ -378,6 +378,13 @@ impl GameDetails {
                 self.game.roll_turn = Player::Host;
             }
         }
+
+        // Move to the Finished stage
+        if self.game.host_player_rolls[1] != Roll::default()
+            && self.game.joined_player_rolls[1] != Roll::default()
+        {
+            self.game.status = GameStatus::Finished;
+        }
     }
 
     /// Ensure GameStatus is set to Pending
@@ -413,6 +420,28 @@ impl GameDetails {
         }
     }
 
+    /// Ensure Game is finished
+    pub fn ensure_is_finished(&self) -> ContractResult<()> {
+        if self.game.status.ne(&GameStatus::Finished) {
+            Err(StdError::generic_err(
+                ContractError::GameIsNotFinsihed {}.to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    // Ensure provided address is player address
+    pub fn ensure_is_player_address(&self, address: HumanAddr) -> ContractResult<()> {
+        if address == self.game.host_player_address || address == self.game.joined_player_address {
+            Ok(())
+        } else {
+            Err(StdError::generic_err(
+                ContractError::NotAPlayer {}.to_string(),
+            ))
+        }
+    }
+
     /// Ensure given account can make a roll in the game
     pub fn ensure_can_roll(&self, address: HumanAddr) -> ContractResult<()> {
         let can_roll = match self.game.roll_turn {
@@ -427,13 +456,6 @@ impl GameDetails {
         } else {
             Ok(())
         }
-    }
-
-    /// Whether the game is finished
-    pub fn is_finished(&self) -> bool {
-        // check whether both players rolled a second time
-        self.game.host_player_rolls[1] != Roll::default()
-            && self.game.joined_player_rolls[1] != Roll::default()
     }
 }
 
@@ -513,6 +535,7 @@ pub enum GameStatus {
     Pending,
     Started,
     ReRoll,
+    Finished,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]

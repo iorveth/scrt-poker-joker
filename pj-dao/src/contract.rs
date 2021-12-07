@@ -56,6 +56,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         } => join_game(deps, env, nft_id, game_id, secret),
         HandleMsg::Roll { game_id } => roll(deps, env, game_id),
         HandleMsg::ReRoll { game_id, dices } => reroll(deps, env, game_id, dices),
+        HandleMsg::EndGame { game_id } => end_game(deps, env, game_id),
     }
 }
 
@@ -297,93 +298,109 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
 
     let game_json = Json::serialize(&Game::from(game_details.clone()))?;
 
-    // determine a winner and get bank messages after game completion
-    let (messages, log) = if game_details.is_finished() {
-        // determine a winner and complete payments
-        let winner = game_details.determine_a_winner();
+    // save updated game state
+    save_game(&mut deps.storage, game_id, &game_details)?;
 
-        // we need to increase nft xp if there is a winner
-        let mut set_metadata_msg: Option<CosmosMsg> = None;
-        if winner.is_some() {
-            let token_id = match winner {
-                Some(Player::Host) => game_details.game.host_player_nft_id.clone(),
-                Some(Player::Joined) => game_details.game.joined_player_nft_id.clone(),
-                _ => unreachable!(),
-            };
+    let log = vec![log(
+        "rerolled",
+        format!("game_id {} \n {:?} ", game_id, game_json),
+    )];
 
-            let current_winner_metadata: NftQueryAnswer =
-                deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                    contract_addr: nft_address(&deps.storage)?,
-                    /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
-                    /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
-                    callback_code_hash: nft_code_hash(&deps.storage)?,
-                    /// msg is the json-encoded QueryMsg struct
-                    msg: to_binary(&NftQueryMsg::NftInfo {
-                        token_id: token_id.clone(),
-                    })?,
-                }))?;
+    Ok(HandleResponse {
+        messages: vec![],
+        log,
+        data: None,
+    })
+}
 
-            let new_ext = match current_winner_metadata {
-                NftQueryAnswer::NftInfo {
-                    token_uri,
-                    extension,
-                } => {
-                    if let Some(mut ext) = extension {
-                        ext.xp += 5;
-                        ext
-                    } else {
-                        return Err(StdError::generic_err("unable to set metadata with uri"));
-                    }
-                }
-                _ => {
-                    return Err(StdError::generic_err(
-                        "unable to get metadata from nft contract",
-                    ));
-                }
-            };
+pub fn end_game<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    game_id: GameId,
+) -> ContractResult<HandleResponse> {
+    // ensure game exists
+    let game_details = load_game(&deps.storage, game_id)?;
 
-            set_metadata_msg = Some(CosmosMsg::Wasm(WasmMsg::Execute {
+    // ensure game is finished and can be ended
+    game_details.ensure_is_finished()?;
+
+    // ensure given address is player address
+    game_details.ensure_is_player_address(env.message.sender)?;
+
+    let game_json = Json::serialize(&Game::from(game_details.clone()))?;
+
+    // determine a winner and complete payments
+    let winner = game_details.determine_a_winner();
+
+    // we need to increase nft xp if there is a winner
+    let set_metadata_msg = if let Some(winner) = winner {
+        let token_id = match winner {
+            Player::Host => game_details.game.host_player_nft_id.clone(),
+            Player::Joined => game_details.game.joined_player_nft_id.clone(),
+        };
+
+        let current_winner_metadata: NftQueryAnswer =
+            deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
                 contract_addr: nft_address(&deps.storage)?,
+                /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
+                /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
                 callback_code_hash: nft_code_hash(&deps.storage)?,
-                msg: to_binary(&NftHandleMsg::SetMetadata {
-                    token_id,
-                    public_metadata: Some(Metadata {
-                        token_uri: None,
-                        extension: Some(new_ext),
-                    }),
-                    private_metadata: None,
-                    padding: None,
+                /// msg is the json-encoded QueryMsg struct
+                msg: to_binary(&NftQueryMsg::NftInfo {
+                    token_id: token_id.clone(),
                 })?,
-                send: vec![],
-            }));
-        }
+            }))?;
 
-        let mut messages = game_details.complete_checkout(env.contract.address, winner);
+        let new_ext = match current_winner_metadata {
+            NftQueryAnswer::NftInfo {
+                token_uri,
+                extension,
+            } => {
+                if let Some(mut ext) = extension {
+                    ext.xp += 5;
+                    ext
+                } else {
+                    return Err(StdError::generic_err("unable to set metadata with uri"));
+                }
+            }
+            _ => {
+                return Err(StdError::generic_err(
+                    "unable to get metadata from nft contract",
+                ));
+            }
+        };
 
-        if let Some(msg) = set_metadata_msg {
-            messages.push(msg);
-        }
-
-        // remove game after completion
-        remove_game(&mut deps.storage, game_id);
-
-        let log = vec![log(
-            "game completed",
-            format!("game_id {} \n {:?} ", game_id, game_json),
-        )];
-
-        (messages, log)
+        Some(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: nft_address(&deps.storage)?,
+            callback_code_hash: nft_code_hash(&deps.storage)?,
+            msg: to_binary(&NftHandleMsg::SetMetadata {
+                token_id,
+                public_metadata: Some(Metadata {
+                    token_uri: None,
+                    extension: Some(new_ext),
+                }),
+                private_metadata: None,
+                padding: None,
+            })?,
+            send: vec![],
+        }))
     } else {
-        // save updated game state
-        save_game(&mut deps.storage, game_id, &game_details)?;
-
-        let log = vec![log(
-            "rerolled",
-            format!("game_id {} \n {:?} ", game_id, game_json),
-        )];
-
-        (vec![], log)
+        None
     };
+
+    let mut messages = game_details.complete_checkout(env.contract.address, winner);
+
+    if let Some(msg) = set_metadata_msg {
+        messages.push(msg);
+    }
+
+    // remove game after completion
+    remove_game(&mut deps.storage, game_id);
+
+    let log = vec![log(
+        "game completed",
+        format!("game_id {} \n {:?} ", game_id, game_json),
+    )];
 
     Ok(HandleResponse {
         messages,

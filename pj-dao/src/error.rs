@@ -24,4 +24,8 @@ pub enum ContractError {
     QueryPlayerNotValid {},
     #[error("NotEnoughXpForTheBaseBet")]
     NotEnoughXpForTheBaseBet {},
+    #[error("GameIsNotFinsihed")]
+    GameIsNotFinsihed {},
+    #[error("NotAPlayer")]
+    NotAPlayer {},
 }
