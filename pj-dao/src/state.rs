@@ -1,19 +1,12 @@
-use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::any::type_name;
 
 use crate::contract::GameId;
 use crate::game::GameDetails;
 
-use cosmwasm_std::{
-    Api, BlockInfo, CanonicalAddr, HumanAddr, ReadonlyStorage, StdError, StdResult, Storage,
-};
-use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
+use cosmwasm_std::{CanonicalAddr, HumanAddr, ReadonlyStorage, StdError, StdResult, Storage};
 
-use secret_toolkit::{
-    serialization::{Bincode2, Json, Serde},
-    storage::{AppendStore, AppendStoreMut},
-};
+use secret_toolkit::serialization::{Bincode2, Json, Serde};
 
 pub static CONFIG_KEY: &[u8] = b"config";
 
