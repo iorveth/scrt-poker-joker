@@ -268,8 +268,19 @@ impl GameDetails {
         // Update pool
         self.add_stake(NUM_OF_DICES, self.game.roll_turn);
 
-        let mut combined_secret = self.host_player_secret.to_vec();
-        combined_secret.extend(self.joined_player_secret);
+        let mut combined_secret = vec![];
+
+        match self.game.roll_turn {
+            Player::Host => {
+                combined_secret.extend(self.host_player_secret);
+                combined_secret.extend(self.joined_player_secret);
+            }
+            Player::Joined => {
+                combined_secret.extend(self.joined_player_secret);
+                combined_secret.extend(self.host_player_secret);
+            }
+        }
+
         combined_secret.extend(&game_id.to_be_bytes()); // game counter
 
         let seed: [u8; 32] = Sha256::digest(&combined_secret).into();
@@ -315,9 +326,22 @@ impl GameDetails {
 
         self.add_stake(num_of_dices, self.game.roll_turn);
 
-        let mut combined_secret = self.joined_player_secret.to_vec();
-        combined_secret.extend(self.host_player_secret);
+        let mut combined_secret = vec![];
+
+        match self.game.roll_turn {
+            Player::Host => {
+                combined_secret.extend(self.host_player_secret);
+                combined_secret.extend(self.joined_player_secret);
+            }
+            Player::Joined => {
+                combined_secret.extend(self.joined_player_secret);
+                combined_secret.extend(self.host_player_secret);
+            }
+        }
+
         combined_secret.extend(&game_id.to_be_bytes()); // game counter
+
+        combined_secret.extend(&num_of_dices.to_be_bytes()); // num of dices to reroll
 
         let seed: [u8; 32] = Sha256::digest(&combined_secret).into();
 
