@@ -20,4 +20,6 @@ pub enum ContractError {
     GivenAccountCannotMakeARoll {},
     #[error("AlreadyJoined")]
     AlreadyJoined {},
+    #[error("QueryPlayerNotValid")]
+    QueryPlayerNotValid {},
 }

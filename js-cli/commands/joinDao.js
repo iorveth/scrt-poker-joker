@@ -36,5 +36,6 @@ const joinDao = async () => {
     wasmEvent.attributes[wasmEvent.attributes.length - 1].value;
   console.log("Player 1 NFT ID: ", player1NftId);
   conf.set("player1NftId", player1NftId.trim());
+  conf.set("player1Addr", accAddress1);
 };
 module.exports = joinDao;
