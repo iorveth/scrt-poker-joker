@@ -329,7 +329,7 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
                     extension,
                 } => {
                     if let Some(mut ext) = extension {
-                        ext.xp += 1;
+                        ext.xp += 5;
                         ext
                     } else {
                         return Err(StdError::generic_err("unable to set metadata with uri"));
