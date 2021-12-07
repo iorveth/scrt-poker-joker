@@ -7,14 +7,6 @@ const {
 } = require("secretjs");
 
 const fs = require("fs");
-<<<<<<< HEAD:js-cli/commands/deploy.js
-const conf = new (require("conf"))();
-const customFees = require("../util.js");
-
-const deploy = async () => {
-  //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
-  const httpUrl = process.env.SECRET_REST_URL;
-=======
 const conf = new (require('conf'))()
 const customFees = require("../util.js")
 
@@ -23,7 +15,6 @@ const deploy = async () => {
 
     //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
     const httpUrl = process.env.SECRET_REST_URL;
->>>>>>> e1fe8c7 (wip: pulling new dao game pr):js-deploy/deploy.js
   const mnemonic = process.env.ADMIN_MNEMONIC;
   const signingPen = await Secp256k1Pen.fromMnemonic(mnemonic);
   const pubkey = encodeSecp256k1Pubkey(signingPen.pubkey);
@@ -37,13 +28,7 @@ const deploy = async () => {
     customFees
   );
 
-<<<<<<< HEAD:js-cli/commands/deploy.js
   // ---- Use Admin client to upload contracts ----
-=======
-
-
-    // ---- Use Admin client to upload contracts ----
->>>>>>> e1fe8c7 (wip: pulling new dao game pr):js-deploy/deploy.js
   const daoWasm = fs.readFileSync("../pj-dao/contract.wasm");
   let uploadReceipt = await signClient.upload(daoWasm, {});
   const daoCodeId = uploadReceipt.codeId;

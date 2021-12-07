@@ -6,8 +6,8 @@ use crate::msg::{
 };
 use crate::state::{
     load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash, nft_code_id,
-    save_game, save_joiner, save_last_game_index, save_nft_address, save_nft_code_hash,
-    save_nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
+    remove_game, save_game, save_joiner, save_last_game_index, save_nft_address,
+    save_nft_code_hash, save_nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
