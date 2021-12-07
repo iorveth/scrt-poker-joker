@@ -14,24 +14,6 @@ pub struct InitMsg {
     pub nft_code_hash: String,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum NftHandleMsg {
-    MintDiceNft {
-        owner: Option<HumanAddr>,
-        /// viewing key set by the dao for this dice nft
-        key: String,
-        /// optional public metadata that can be seen by everyone
-        private_metadata: Option<Metadata>,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct JoinNftDetails {
-    pub id: String,
-    pub viewing_key: String,
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
@@ -63,11 +45,20 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     // retrieve all games by status provided
-    GamesByStatus { status: GameStatus },
+    GamesByStatus {
+        status: GameStatus,
+    },
     // get game under specified id
-    Game { game_id: GameId },
+    Game {
+        game_id: GameId,
+    },
     // NFT address
     NftAddress {},
+    // retrieve Nfts from player
+    PlayerNfts {
+        player: HumanAddr,
+        viewer: HumanAddr,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
@@ -168,6 +159,64 @@ pub struct InitConfig {
     /// Indicates whether burn functionality should be enabled
     /// default: False
     pub enable_burn: Option<bool>,
+}
+
+// ---- specific messages for the NFT contract ----
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NftHandleMsg {
+    MintDiceNft {
+        owner: HumanAddr,
+        /// viewing key set by the dao for this dice nft
+        key: String,
+        /// optional public metadata that can be seen by everyone
+        private_metadata: Option<Metadata>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct JoinNftDetails {
+    pub id: String,
+    pub viewing_key: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum NftQueryAnswer {
+    OwnerOf {
+        owner: HumanAddr,
+        approvals: Vec<Cw721Approval>,
+    },
+    TokenList {
+        tokens: Vec<String>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NftQueryMsg {
+    OwnerOf {
+        token_id: String,
+        /// optional address and key requesting to view the token owner
+        viewer: Option<ViewerInfo>,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+    /// displays a list of all the tokens belonging to the input owner in which the viewer
+    /// has view_owner permission
+    Tokens {
+        owner: HumanAddr,
+        /// optional address of the querier if different from the owner
+        viewer: Option<HumanAddr>,
+        /// optional viewing key
+        viewing_key: Option<String>,
+        /// paginate by providing the last token_id received in the previous query
+        start_after: Option<String>,
+        /// optional number of token ids to display
+        limit: Option<u32>,
+    },
 }
 // ----- From NFT contract, todo move to lib ------
 /// info needed to perform a callback message after instantiation
@@ -278,28 +327,6 @@ pub enum Expiration {
 pub struct Cw721Approval {
     pub spender: HumanAddr,
     pub expires: Expiration,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum NftQueryAnswer {
-    OwnerOf {
-        owner: HumanAddr,
-        approvals: Vec<Cw721Approval>,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum NftQueryMsg {
-    OwnerOf {
-        token_id: String,
-        /// optional address and key requesting to view the token owner
-        viewer: Option<ViewerInfo>,
-        /// optionally include expired Approvals in the response list.  If ommitted or
-        /// false, expired Approvals will be filtered out of the response
-        include_expired: Option<bool>,
-    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -102,7 +102,7 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
             .into_owned();
 
             let mint_dice_msg = NftHandleMsg::MintDiceNft {
-                owner: Some(env.message.sender.clone()),
+                owner: env.message.sender.clone(),
                 key: viewing_key.clone(),
                 private_metadata: None,
             };
@@ -336,6 +336,9 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::Game { game_id } => to_binary(&query_game(deps, game_id)?),
         QueryMsg::GamesByStatus { status } => to_binary(&query_games_by_status(deps, status)?),
         QueryMsg::NftAddress {} => to_binary(&query_nft_address(deps)?),
+        QueryMsg::PlayerNfts { player, viewer } => {
+            to_binary(&query_player_nfts(deps, player, viewer)?)
+        }
     }
 }
 
@@ -372,6 +375,47 @@ fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
             }
         })
         .collect()
+}
+
+fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    player: HumanAddr,
+    viewer: HumanAddr,
+) -> StdResult<Vec<String>> {
+    let player_raw = deps.api.canonical_address(&player)?;
+    if let Some(viewing_key) = load_joiner(&deps.storage, &player_raw)? {
+        let query = NftQueryMsg::Tokens {
+            owner: player,
+            /// optional address of the querier if different from the owner
+            viewer: Some(viewer),
+            /// optional viewing key
+            viewing_key: Some(viewing_key),
+            /// paginate by providing the last token_id received in the previous query
+            start_after: None,
+            /// optional number of token ids to display
+            limit: None,
+        };
+
+        let tokens: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: nft_address(&deps.storage)?,
+            /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
+            /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
+            callback_code_hash: nft_code_hash(&deps.storage)?,
+            /// msg is the json-encoded QueryMsg struct
+            msg: to_binary(&query)?,
+        }))?;
+
+        match tokens {
+            NftQueryAnswer::TokenList { tokens: list } => Ok(list),
+            _ => Err(StdError::generic_err(
+                ContractError::QueryPlayerNotValid {}.to_string(),
+            )),
+        }
+    } else {
+        Err(StdError::generic_err(
+            ContractError::QueryPlayerNotValid {}.to_string(),
+        ))
+    }
 }
 
 // Check whether given player provided max amount of coins, that can potentially be lost in the game
