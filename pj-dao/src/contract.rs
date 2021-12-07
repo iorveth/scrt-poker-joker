@@ -1,16 +1,20 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, Game, GameDetails, GameStatus, NUM_OF_DICES};
-use crate::msg::{HandleMsg, InitMsg, NftHandleMsg, NftInitMsg, PostInitCallback, QueryMsg};
+use crate::msg::{
+    HandleMsg, InitMsg, JoinNftDetails, NftHandleMsg, NftInitMsg, NftQueryAnswer, NftQueryMsg,
+    PostInitCallback, QueryMsg, ViewerInfo,
+};
 use crate::state::{
-    load_game, load_last_game_index, nft_address, nft_code_hash, nft_code_id, remove_game,
-    save_game, save_last_game_index, save_nft_address, save_nft_code_hash, save_nft_code_id,
-    PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
+    load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash, nft_code_id,
+    remove_game, save_game, save_joiner, save_last_game_index, save_nft_address, save_nft_code_hash,
+    save_nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
+
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
     CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult,
-    LogAttribute, Order, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage,
-    WasmMsg, KV,
+    LogAttribute, Order, Querier, QueryRequest, QueryResult, ReadonlyStorage, StdError, StdResult,
+    Storage, WasmMsg, WasmQuery, KV,
 };
 use std::convert::TryInto;
 
@@ -40,7 +44,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::CreateNftContract {} => create_nft_contract(deps, env),
         HandleMsg::StoreNftContract {} => store_nft_contract_addr(deps, env),
-        HandleMsg::JoinDao { nft_id } => join_dao(deps, env, nft_id),
+        HandleMsg::JoinDao { nft } => join_dao(deps, env, nft),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
@@ -59,28 +63,73 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    _with_nft: Option<String>,
+    nft: Option<JoinNftDetails>,
 ) -> ContractResult<HandleResponse> {
-    // TODO: do we need to mint for this user?
     // TODO: charge user?
-    let mint_dice_msg = NftHandleMsg::MintDiceNft {
-        owner: Some(env.message.sender.clone()),
-        private_metadata: None,
-    };
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let is_joined = load_joiner(&deps.storage, &sender_raw)?;
 
-    let contract_addr = nft_address(&deps.storage)?;
-    let callback_code_hash = nft_code_hash(&deps.storage)?;
-    let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr,
-        callback_code_hash,
-        msg: to_binary(&mint_dice_msg)?,
-        send: vec![],
-    });
-    Ok(HandleResponse {
-        messages: vec![mint_msg],
-        log: vec![log("joined", env.message.sender)],
-        data: None,
-    })
+    if is_joined == None {
+        let mut response_msg: Vec<CosmosMsg> = vec![];
+
+        // if a nft_id is provided, we check if msg.sender owns the nft
+        // in order to check, dao must be provided the viewing key, at least this once
+        if let Some(nft) = nft {
+            // check this belongs to the user
+            // TODO query
+            let query = WasmQuery::Smart {
+                contract_addr: nft_address(&deps.storage)?,
+                callback_code_hash: nft_code_hash(&deps.storage)?,
+                msg: to_binary(&NftQueryMsg::OwnerOf {
+                    token_id: nft.id,
+                    viewer: Some(ViewerInfo {
+                        address: env.message.sender.clone(),
+                        viewing_key: nft.viewing_key.clone(),
+                    }),
+                    include_expired: None,
+                })?,
+            };
+            save_joiner(&mut deps.storage, &sender_raw, nft.viewing_key)?;
+        } else {
+            // we will mint a new nft for the owner
+            let viewing_key = String::from_utf8_lossy(
+                &[
+                    env.message.sender.0.as_bytes(),
+                    &env.block.time.to_be_bytes(),
+                ]
+                .concat(),
+            )
+            .into_owned();
+
+            let mint_dice_msg = NftHandleMsg::MintDiceNft {
+                owner: Some(env.message.sender.clone()),
+                key: viewing_key.clone(),
+                private_metadata: None,
+            };
+
+            // save the new joiner's viewing key
+            save_joiner(&mut deps.storage, &sender_raw, viewing_key)?;
+
+            let contract_addr = nft_address(&deps.storage)?;
+            let callback_code_hash = nft_code_hash(&deps.storage)?;
+            let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr,
+                callback_code_hash,
+                msg: to_binary(&mint_dice_msg)?,
+                send: vec![],
+            });
+            response_msg.push(mint_msg);
+        }
+        Ok(HandleResponse {
+            messages: response_msg,
+            log: vec![log("joined", env.message.sender)],
+            data: None,
+        })
+    } else {
+        Err(StdError::generic_err(
+            ContractError::AlreadyJoined {}.to_string(),
+        ))
+    }
 }
 
 pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(

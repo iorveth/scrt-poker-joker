@@ -11,5 +11,5 @@ cd pj-dao/
 gzip -d contract.wasm.gz
 cd ../pj-nft/
 gzip -d contract.wasm.gz
-cd ../js-deploy
-node deploy.js
+cd ../js-cli
+node index.js deploy 

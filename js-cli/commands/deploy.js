@@ -1,5 +1,4 @@
 const {
-  CosmWasmClient,
   EnigmaUtils,
   Secp256k1Pen,
   SigningCosmWasmClient,
@@ -8,43 +7,15 @@ const {
 } = require("secretjs");
 
 const fs = require("fs");
+const conf = new (require("conf"))();
+const customFees = require("../util.js");
 
-// Load environment variables
-require("dotenv").config({ path: `${__dirname}/../.env.dev` });
-
-const customFees = {
-  upload: {
-    amount: [{ amount: "20000000", denom: "uscrt" }],
-    gas: "20000000",
-  },
-  init: {
-    amount: [{ amount: "5000000", denom: "uscrt" }],
-    gas: "5000000",
-  },
-  exec: {
-    amount: [{ amount: "500000", denom: "uscrt" }],
-    gas: "500000",
-  },
-  send: {
-    amount: [{ amount: "80000", denom: "uscrt" }],
-    gas: "80000",
-  },
-};
-
-const main = async () => {
+const deploy = async () => {
+  //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
   const httpUrl = process.env.SECRET_REST_URL;
-
-  // Use key created in tutorial #2
   const mnemonic = process.env.ADMIN_MNEMONIC;
-
-  // A pen s the most basic tool you can think of for signing.
-  // This wraps a single keypair and allows for signing.
   const signingPen = await Secp256k1Pen.fromMnemonic(mnemonic);
-
-  // Get the public key
   const pubkey = encodeSecp256k1Pubkey(signingPen.pubkey);
-
-  // get the wallet address
   const accAddress = pubkeyToAddress(pubkey, "secret");
   const txEncryptionSeed = EnigmaUtils.GenerateNewSeed();
   const signClient = new SigningCosmWasmClient(
@@ -55,8 +26,7 @@ const main = async () => {
     customFees
   );
 
-  console.log(`Admin wallet address=${accAddress}`);
-
+  // ---- Use Admin client to upload contracts ----
   const daoWasm = fs.readFileSync("../pj-dao/contract.wasm");
   let uploadReceipt = await signClient.upload(daoWasm, {});
   const daoCodeId = uploadReceipt.codeId;
@@ -67,6 +37,7 @@ const main = async () => {
   const nftCodeId = uploadReceipt.codeId;
   console.log("uploaded nft wasm: ", nftCodeId);
 
+  // ---- Use Admin client to instantiate DAO ----
   const nftContractCodeHash = await signClient.restClient.getCodeHashByCodeId(
     nftCodeId
   );
@@ -79,10 +50,12 @@ const main = async () => {
     daoInitMsg,
     "PokerJokerDAO" + Math.ceil(Math.random() * 10000)
   );
-  console.log("instantiated dao contract: ", daoContract);
-  const daoAddress = daoContract.contractAddress;
 
-  console.log("instantiating nft contract");
+  const daoAddr = daoContract.contractAddress;
+  conf.set("daoAddr", daoAddr);
+  console.log("instantiated dao contract: ", daoAddr);
+
+  // ---- Use Admin client to instantiate NFT via DAO ----
   const createContractMsg = {
     create_nft_contract: {},
   };
@@ -94,11 +67,13 @@ const main = async () => {
     console.log(e);
   }
 
+  // ----  Query DAO to get NFT contract address  and info ----
   console.log("Querying dao contract for nft contract address");
-  const nftAddr = await signClient.queryContractSmart(daoAddress, {
+  const nftAddr = await signClient.queryContractSmart(daoAddr, {
     nft_address: {},
   });
   console.log(`nftAddress: ${nftAddr}`);
+  conf.set("nftAddr", nftAddr);
 
   console.log(
     "Querying nft contract for contract info to ensure address is correct"
@@ -108,27 +83,6 @@ const main = async () => {
   });
 
   console.log(`nftInfo: `, nftInfo);
-
-  // ---- Deployment done ----
-
-  console.log("player 1 joins dao and we mint nft for them");
-  const player1 = process.env.PLAYER1_MNEMONIC;
-  const signingPen1 = await Secp256k1Pen.fromMnemonic(player1);
-  const pubkey1 = encodeSecp256k1Pubkey(signingPen1.pubkey);
-  const accAddress1 = pubkeyToAddress(pubkey1, "secret");
-  const txEncryptionSeed1 = EnigmaUtils.GenerateNewSeed();
-  const player1Client = new SigningCosmWasmClient(
-    httpUrl,
-    accAddress1,
-    (signBytes) => signingPen1.sign(signBytes),
-    txEncryptionSeed1,
-    customFees
-  );
-
-  // This is basically minting nft for the signer at the moment
-  const joinDaoMsg = { join_dao: { nft_id: "" } };
-  let r = await player1Client.execute(daoContract.contractAddress, joinDaoMsg);
-  console.log("joined Dao and mint: ", JSON.stringify(r));
 };
 
-main();
+module.exports = deploy;
