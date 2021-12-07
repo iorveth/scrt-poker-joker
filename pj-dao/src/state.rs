@@ -1,19 +1,12 @@
-use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::any::type_name;
 
 use crate::contract::GameId;
 use crate::game::GameDetails;
 
-use cosmwasm_std::{
-    Api, BlockInfo, CanonicalAddr, HumanAddr, ReadonlyStorage, StdError, StdResult, Storage,
-};
-use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
+use cosmwasm_std::{CanonicalAddr, HumanAddr, ReadonlyStorage, StdError, StdResult, Storage};
 
-use secret_toolkit::{
-    serialization::{Bincode2, Json, Serde},
-    storage::{AppendStore, AppendStoreMut},
-};
+use secret_toolkit::serialization::{Bincode2, Json, Serde};
 
 pub static CONFIG_KEY: &[u8] = b"config";
 
@@ -31,6 +24,9 @@ pub const PREFIX_NFT_CODE_ID: &[u8] = b"nftCodeId";
 
 /// prefix for the nft code hash
 pub const PREFIX_NFT_CODE_HASH: &[u8] = b"nftCodeHash";
+
+/// prefix for dao users
+pub const PREFIX_PLAYERS: &[u8] = b"players";
 
 // last game index
 pub fn save_last_game_index<'a, S: Storage>(storage: &'a mut S, index: &GameId) -> StdResult<()> {
@@ -71,11 +67,6 @@ pub fn nft_code_hash<'a, S: Storage>(storage: &'a S) -> StdResult<String> {
     load(storage, PREFIX_NFT_CODE_HASH)
 }
 
-// supporting nft code id
-// pub fn save_nft_code_id<'a, S: Storage>(storage: &'a mut S) -> StdResult<()> {
-//     save(storage, PREFIX_NFT_CONTRACT, value)
-// }
-
 // Get game storage key from it's id
 pub fn get_game_key(game_id: GameId) -> Vec<u8> {
     PREFIX_GAMES
@@ -83,6 +74,18 @@ pub fn get_game_key(game_id: GameId) -> Vec<u8> {
         .chain(game_id.to_be_bytes().iter())
         .copied()
         .collect()
+}
+
+pub fn save_joiner<S: Storage>(
+    storage: &mut S,
+    joiner: &CanonicalAddr,
+    viewing_key: String,
+) -> StdResult<()> {
+    save(storage, &joiner.0 .0, &viewing_key)
+}
+
+pub fn load_joiner<S: Storage>(storage: &S, joiner: &CanonicalAddr) -> StdResult<Option<String>> {
+    may_load(storage, &joiner.0 .0)
 }
 
 pub fn save_game<S: Storage>(

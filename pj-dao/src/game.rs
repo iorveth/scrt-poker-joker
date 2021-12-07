@@ -1,6 +1,6 @@
 use crate::contract::GameId;
 use crate::error::{ContractError, ContractResult};
-use cosmwasm_std::{coin, CanonicalAddr, Coin, StdError};
+use cosmwasm_std::{coin, BankMsg, Coin, CosmosMsg, HumanAddr, StdError};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
 use rand_core::{RngCore, SeedableRng};
@@ -19,7 +19,8 @@ pub const MIN_DICE_NUMBER: u8 = 1;
 pub const MAX_DICE_NUMBER: u8 = 6;
 
 // (5 dices) x 2 rounds
-pub type Rolls = [Option<[u8; NUM_OF_DICES]>; TOTAL_ROUNDS];
+type Roll = [u8; NUM_OF_DICES];
+pub type Rolls = [Roll; TOTAL_ROUNDS];
 
 // Secret bytes provided by the player
 pub type Secret = [u8; 8];
@@ -43,7 +44,7 @@ pub fn calculate_player_total_points(roll: [u8; NUM_OF_DICES]) -> u8 {
     // 4 - 5
     // 5 - 6
 
-    let mut results: [u8; MAX_DICE_NUMBER] = [0; MAX_DICE_NUMBER];
+    let mut results: [u8; MAX_DICE_NUMBER as usize] = [0; MAX_DICE_NUMBER as usize];
 
     for i in 0..MAX_DICE_NUMBER {
         for dice in roll {
@@ -79,6 +80,23 @@ pub fn calculate_player_total_points(roll: [u8; NUM_OF_DICES]) -> u8 {
     }
 }
 
+/// Reroll cchosen dices
+pub fn complete_reroll(
+    rng: &mut ChaChaRng,
+    mut roll: [u8; NUM_OF_DICES],
+    dices: [bool; NUM_OF_DICES],
+) -> [u8; NUM_OF_DICES] {
+    for i in 0..roll.len() {
+        // reroll
+        if dices[i] {
+            // Generate a random value in the range [low, high).
+            // I suppose we need integer values in the range [1, 6]
+            roll[i] = rng.gen_range(MIN_DICE_NUMBER, MAX_DICE_NUMBER + 1);
+        }
+    }
+    roll
+}
+
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
@@ -109,15 +127,12 @@ impl GameDetails {
     /// Join the game
     pub fn join(
         &mut self,
-        joined_player_address: CanonicalAddr,
+        joined_player_address: HumanAddr,
         joined_player_nft_id: String,
         joined_player_secret: Secret,
     ) {
         // add coins sent by a second player
-        self.game.total_pool = Coin::new(
-            self.game.total_pool.amount.u128() * 2,
-            &self.game.total_pool.denom,
-        );
+        self.game.game_pool.joined_player_pool = locked_per_player(&self.game.base_bet);
 
         self.game.joined_player_address = joined_player_address;
         self.game.joined_player_nft_id = joined_player_nft_id;
@@ -127,8 +142,132 @@ impl GameDetails {
         self.game.status = GameStatus::Started;
     }
 
+    // Pick player, the sum of which dices numbers is the biggest
+    fn pick_player_with_biggest_dices_sum(&self) -> Option<Player> {
+        let host_player_dices_sum: u8 = self.game.host_player_rolls[1].iter().sum();
+        let joined_player_dices_sum: u8 = self.game.joined_player_rolls[1].iter().sum();
+
+        if host_player_dices_sum > joined_player_dices_sum {
+            Some(Player::Host)
+        } else if host_player_dices_sum < joined_player_dices_sum {
+            Some(Player::Joined)
+        } else {
+            None
+        }
+    }
+
+    // Determine a winner of the game
+    fn determine_a_winner(&self) -> Option<Player> {
+        if self.game.host_player_total_points > self.game.joined_player_total_points {
+            Some(Player::Host)
+        } else if self.game.host_player_total_points < self.game.joined_player_total_points {
+            Some(Player::Joined)
+        } else {
+            self.pick_player_with_biggest_dices_sum()
+        }
+    }
+
+    pub fn complete_checkout(&self, contract_address: HumanAddr) -> Vec<CosmosMsg> {
+        let denom = self.game.game_pool.total_stake.denom.to_string();
+        let total_stake = self.game.game_pool.total_stake.amount;
+        let host_player_pool = self.game.game_pool.host_player_pool.amount;
+        let joined_player_pool = self.game.game_pool.joined_player_pool.amount;
+
+        let mut checkout_messages = vec![
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: contract_address.clone(),
+                to_address: self.game.host_player_address.clone(),
+                amount: vec![Coin {
+                    denom: denom.clone(),
+                    amount: host_player_pool,
+                }],
+            }),
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: contract_address.clone(),
+                to_address: self.game.joined_player_address.clone(),
+                amount: vec![Coin {
+                    denom: denom.clone(),
+                    amount: joined_player_pool,
+                }],
+            }),
+        ];
+
+        match self.determine_a_winner() {
+            Some(Player::Host) => {
+                checkout_messages.push(CosmosMsg::Bank(BankMsg::Send {
+                    from_address: contract_address,
+                    to_address: self.game.host_player_address.clone(),
+                    amount: vec![Coin {
+                        denom,
+                        amount: total_stake,
+                    }],
+                }));
+                checkout_messages
+            }
+            Some(Player::Joined) => {
+                checkout_messages.push(CosmosMsg::Bank(BankMsg::Send {
+                    from_address: contract_address,
+                    to_address: self.game.joined_player_address.clone(),
+                    amount: vec![Coin {
+                        denom,
+                        amount: total_stake,
+                    }],
+                }));
+                checkout_messages
+            }
+            // return money to the users;)
+            None => vec![
+                CosmosMsg::Bank(BankMsg::Send {
+                    from_address: contract_address.clone(),
+                    to_address: self.game.host_player_address.clone(),
+                    amount: vec![Coin {
+                        denom: denom.clone(),
+                        amount: locked_per_player(&self.game.base_bet).amount,
+                    }],
+                }),
+                CosmosMsg::Bank(BankMsg::Send {
+                    from_address: contract_address,
+                    to_address: self.game.joined_player_address.clone(),
+                    amount: vec![Coin {
+                        denom,
+                        amount: locked_per_player(&self.game.base_bet).amount,
+                    }],
+                }),
+            ],
+        }
+    }
+
+    // Add to game stake from the player pool
+    pub fn add_stake(&mut self, number_of_dices: usize, player: Player) {
+        let base_bet = self.game.base_bet.clone();
+
+        let stake = base_bet.amount.u128() * number_of_dices as u128;
+        self.game.game_pool.total_stake = coin(
+            self.game.game_pool.total_stake.amount.u128() + stake,
+            &base_bet.denom,
+        );
+
+        match player {
+            Player::Host => {
+                self.game.game_pool.host_player_pool = coin(
+                    self.game.game_pool.host_player_pool.amount.u128() - stake,
+                    &base_bet.denom,
+                );
+            }
+            Player::Joined => {
+                self.game.game_pool.joined_player_pool = coin(
+                    self.game.game_pool.joined_player_pool.amount.u128() - stake,
+                    &base_bet.denom,
+                );
+            }
+        }
+    }
+
     /// Roll dices
     pub fn roll(&mut self, game_id: GameId) {
+        // Update pool
+        self.add_stake(NUM_OF_DICES, self.game.roll_turn);
+
         let mut combined_secret = self.host_player_secret.to_vec();
         combined_secret.extend(self.joined_player_secret);
         combined_secret.extend(&game_id.to_be_bytes()); // game counter
@@ -148,19 +287,21 @@ impl GameDetails {
         // Change roll turn value
         match self.game.roll_turn {
             Player::Host => {
-                self.game.host_player_rolls[0] = Some(roll);
+                self.game.host_player_rolls[0] = roll;
                 self.game.host_player_total_points = calculate_player_total_points(roll);
                 self.game.roll_turn = Player::Joined;
             }
             Player::Joined => {
-                self.game.joined_player_rolls[0] = Some(roll);
+                self.game.joined_player_rolls[0] = roll;
                 self.game.joined_player_total_points = calculate_player_total_points(roll);
                 self.game.roll_turn = Player::Host;
             }
         }
 
         // Move to the reroll stage
-        if self.game.host_player_rolls[0].is_some() && self.game.joined_player_rolls[0].is_some() {
+        if self.game.host_player_rolls[0] != Roll::default()
+            && self.game.joined_player_rolls[0] != Roll::default()
+        {
             self.game.status = GameStatus::ReRoll;
         }
     }
@@ -168,12 +309,45 @@ impl GameDetails {
     /// Reroll chosen dices
     /// false - do not reroll
     /// true - reroll
-    pub fn reroll(&mut self, dices: [bool; NUM_OF_DICES]) {
+    pub fn reroll(&mut self, game_id: GameId, dices: [bool; NUM_OF_DICES]) {
+        // Update pool
+        let num_of_dices = dices.iter().filter(|dice| **dice == true).count();
+
+        self.add_stake(num_of_dices, self.game.roll_turn);
+
+        let mut combined_secret = self.joined_player_secret.to_vec();
+        combined_secret.extend(self.host_player_secret);
+        combined_secret.extend(&game_id.to_be_bytes()); // game counter
+
+        let seed: [u8; 32] = Sha256::digest(&combined_secret).into();
+
+        let mut rng = ChaChaRng::from_seed(seed);
+
         match self.game.roll_turn {
             Player::Host => {
+                // no dices to reroll
+                if dices.iter().all(|dice| *dice == false) {
+                    self.game.host_player_rolls[1] = self.game.host_player_rolls[0];
+                } else {
+                    // reroll chosen dices
+                    let reroll = complete_reroll(&mut rng, self.game.joined_player_rolls[0], dices);
+                    self.game.host_player_rolls[1] = reroll;
+                    self.game.host_player_total_points = calculate_player_total_points(reroll);
+                }
+
                 self.game.roll_turn = Player::Joined;
             }
             Player::Joined => {
+                // no dices to reroll
+                if dices.iter().all(|dice| *dice == false) {
+                    self.game.joined_player_rolls[1] = self.game.joined_player_rolls[0];
+                } else {
+                    // reroll chosen dices
+                    let reroll = complete_reroll(&mut rng, self.game.joined_player_rolls[0], dices);
+                    self.game.joined_player_rolls[1] = reroll;
+                    self.game.joined_player_total_points = calculate_player_total_points(reroll);
+                }
+
                 self.game.roll_turn = Player::Host;
             }
         }
@@ -213,7 +387,7 @@ impl GameDetails {
     }
 
     /// Ensure given account can make a roll in the game
-    pub fn ensure_can_roll(&self, address: CanonicalAddr) -> ContractResult<()> {
+    pub fn ensure_can_roll(&self, address: HumanAddr) -> ContractResult<()> {
         let can_roll = match self.game.roll_turn {
             Player::Host => self.game.host_player_address == address,
             Player::Joined => self.game.joined_player_address == address,
@@ -231,7 +405,8 @@ impl GameDetails {
     /// Whether the game is finished
     pub fn is_finished(&self) -> bool {
         // check whether both players rolled a second time
-        self.game.host_player_rolls[1].is_some() && self.game.joined_player_rolls[1].is_some()
+        self.game.host_player_rolls[1] != Roll::default()
+            && self.game.joined_player_rolls[1] != Roll::default()
     }
 }
 
@@ -242,8 +417,8 @@ pub struct Game {
     pub status: GameStatus,
     // whether the game is shielded
     pub shielded: bool,
-    pub host_player_address: CanonicalAddr,
-    pub joined_player_address: CanonicalAddr,
+    pub host_player_address: HumanAddr,
+    pub joined_player_address: HumanAddr,
     pub host_player_nft_id: String,
     pub joined_player_nft_id: String,
     // base bet per each dice
@@ -254,8 +429,12 @@ pub struct Game {
     pub joined_player_rolls: Rolls,
     // total game stake
     pub total_stake: Coin,
-    // total game pool
-    pub total_pool: Coin,
+    // game pool
+    pub game_pool: GamePool,
+    // host player pool
+    pub host_player_pool: Coin,
+    // host player pool
+    pub joined_player_pool: Coin,
     // total points amount scored throughout the game by host player
     pub host_player_total_points: u8,
     // total points amount scored throughout the game by joined player
@@ -266,19 +445,37 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(
-        host_player_address: CanonicalAddr,
-        host_player_nft_id: String,
-        base_bet: Coin,
-    ) -> Self {
+    pub fn new(host_player_address: HumanAddr, host_player_nft_id: String, base_bet: Coin) -> Self {
         Self {
             status: GameStatus::Pending,
             shielded: false,
             host_player_address,
             host_player_nft_id,
-            total_pool: locked_per_player(&base_bet),
+            game_pool: GamePool::new(locked_per_player(&base_bet)),
             base_bet,
             ..Game::default()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct GamePool {
+    // an amount already staked in the game
+    pub total_stake: Coin,
+    // host player pool
+    pub host_player_pool: Coin,
+    // joined player pool
+    pub joined_player_pool: Coin,
+}
+
+impl GamePool {
+    /// Create a new GamePool
+    fn new(host_player_pool: Coin) -> Self {
+        Self {
+            total_stake: Coin::default(),
+            host_player_pool,
+            joined_player_pool: Coin::default(),
         }
     }
 }
@@ -291,7 +488,7 @@ pub enum GameStatus {
     ReRoll,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Player {
     Host,
