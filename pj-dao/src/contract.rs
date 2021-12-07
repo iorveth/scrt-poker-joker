@@ -251,6 +251,9 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
 
     // check whether dao member
 
+    // ensure base bet is greater then zero
+    ensure_correct_base_bet(&base_bet)?;
+
     // ensure enough coins provided
     ensure_has_coins_for_game(&env, &base_bet)?;
 
@@ -578,6 +581,18 @@ pub fn ensure_has_coins_for_game(env: &Env, base_bet: &Coin) -> ContractResult<(
     if !has_coins(&env.message.sent_funds, &locked_per_player(base_bet)) {
         Err(StdError::generic_err(
             ContractError::NotEnoughTokensForTheGame {}.to_string(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Ensure base bet is greater then zero
+pub fn ensure_correct_base_bet(base_bet: &Coin) -> ContractResult<()> {
+    // should be ge 0
+    if base_bet.amount.u128() == 0 {
+        Err(StdError::generic_err(
+            ContractError::BaseBetCanNotBeZero {}.to_string(),
         ))
     } else {
         Ok(())

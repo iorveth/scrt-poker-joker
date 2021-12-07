@@ -32,4 +32,6 @@ pub enum ContractError {
     GameIsNotFinsihed {},
     #[error("NotAPlayer")]
     NotAPlayer {},
+    #[error("BaseBetCanNotBeZero")]
+    BaseBetCanNotBeZero {},
 }
