@@ -16,7 +16,6 @@ use cosmwasm_std::{
     Storage, WasmMsg, WasmQuery, KV,
 };
 use std::convert::TryInto;
-use std::os::unix::prelude::OsStrExt;
 
 pub type GameId = u64;
 
