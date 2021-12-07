@@ -288,8 +288,8 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
     // ensure game exists
     let mut game_details = load_game(&deps.storage, game_id)?;
 
-    // ensure game status is set to started
-    game_details.ensure_is_started()?;
+    // ensure game status is set to reroll
+    game_details.ensure_is_reroll()?;
 
     // Ensure given account can make a reroll in a game
     game_details.ensure_can_roll(env.message.sender)?;
