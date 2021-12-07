@@ -273,7 +273,7 @@ pub fn roll<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         log: vec![log(
             "rolled",
-            format!("game_id {} \n {:#?} ", game_id, game_json),
+            format!("game_id {} \n {:?} ", game_id, game_json),
         )],
         data: None,
     })
@@ -308,14 +308,14 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
 
         let log = vec![log(
             "game completed",
-            format!("game_id {} \n {:#?} ", game_id, game_json),
+            format!("game_id {} \n {:?} ", game_id, game_json),
         )];
 
         (messages, log)
     } else {
         let log = vec![log(
             "rerolled",
-            format!("game_id {} \n {:#?} ", game_id, game_json),
+            format!("game_id {} \n {:?} ", game_id, game_json),
         )];
 
         (vec![], log)
