@@ -6,8 +6,9 @@ use crate::msg::{
 };
 use crate::state::{
     load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash, nft_code_id,
-    save_game, save_joiner, save_last_game_index, save_nft_address, save_nft_code_hash,
+    remove_game, save_game, save_joiner, save_last_game_index, save_nft_address, save_nft_code_hash,
     save_nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
+
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
@@ -34,25 +35,6 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     Ok(InitResponse::default())
 }
-
-// pub fn winner_winner_chicken_dinner(
-//     contract_address: HumanAddr,
-//     player: HumanAddr,
-//     amount: Uint128,
-// ) -> HandleResponse {
-//     HandleResponse {
-//         messages: vec![CosmosMsg::Bank(BankMsg::Send {
-//             from_address: contract_address,
-//             to_address: player,
-//             amount: vec![Coin {
-//                 denom: "uscrt".to_string(),
-//                 amount,
-//             }],
-//         })],
-//         log: vec![],
-//         data: None,
-//     }
-// }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -206,15 +188,13 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
 
     // check whether dao member
 
-    let host_player_address = deps.api.canonical_address(&env.message.sender)?;
-
     // ensure enough coins provided
     ensure_has_coins_for_game(&env, &base_bet)?;
 
     let game_id = load_last_game_index(&deps.storage)?;
 
     // create new game with provided host player secret
-    let game = Game::new(host_player_address, nft_id, base_bet);
+    let game = Game::new(env.message.sender, nft_id, base_bet);
     let game_details = GameDetails::new(game, secret.to_be_bytes());
 
     // save newly initialized game
@@ -237,8 +217,6 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     game_id: GameId,
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
-    let joined_player_address = deps.api.canonical_address(&env.message.sender)?;
-
     // check whether nft supports base_bet
 
     // check whether dao member
@@ -253,7 +231,7 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     game_details.ensure_is_pending()?;
 
     // join the game
-    game_details.join(joined_player_address, nft_id, secret.to_be_bytes());
+    game_details.join(env.message.sender, nft_id, secret.to_be_bytes());
 
     // save updated game state
     save_game(&mut deps.storage, game_id, &game_details)?;
@@ -270,8 +248,6 @@ pub fn roll<S: Storage, A: Api, Q: Querier>(
     env: Env,
     game_id: GameId,
 ) -> ContractResult<HandleResponse> {
-    let joined_player_address = deps.api.canonical_address(&env.message.sender)?;
-
     // ensure game exists
     let mut game_details = load_game(&deps.storage, game_id)?;
 
@@ -279,7 +255,7 @@ pub fn roll<S: Storage, A: Api, Q: Querier>(
     game_details.ensure_is_started()?;
 
     // Ensure given account can now make a roll in a game
-    game_details.ensure_can_roll(joined_player_address)?;
+    game_details.ensure_can_roll(env.message.sender)?;
 
     game_details.roll(game_id);
 
@@ -300,28 +276,32 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
     game_id: GameId,
     dices: [bool; NUM_OF_DICES],
 ) -> ContractResult<HandleResponse> {
-    let joined_player_address = deps.api.canonical_address(&env.message.sender)?;
-
     // ensure game exists
     let mut game_details = load_game(&deps.storage, game_id)?;
 
     // ensure game status is set to started
     game_details.ensure_is_started()?;
 
-    // Ensure given account can make a roll in a game
-    game_details.ensure_can_roll(joined_player_address)?;
+    // Ensure given account can make a reroll in a game
+    game_details.ensure_can_roll(env.message.sender)?;
 
-    game_details.reroll(dices);
+    game_details.reroll(game_id, dices);
 
-    // Game storage removal
-    // if game_details.is_finished() {
-    //     // remove game after completion
-    //     remove_game(&mut deps.storage, game_id, &game_details)?;
-    // }
+    // determine a winner and get bank messages after game completion
+    let messages = if game_details.is_finished() {
+        // determine a winner and complete payments
+        let messages = game_details.complete_checkout(env.contract.address);
 
-    // check whether player can roll
+        // remove game after completion
+        remove_game(&mut deps.storage, game_id);
+
+        messages
+    } else {
+        vec![]
+    };
+
     Ok(HandleResponse {
-        messages: vec![],
+        messages,
         log: vec![],
         data: None,
     })
