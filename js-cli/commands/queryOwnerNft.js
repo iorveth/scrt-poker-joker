@@ -7,14 +7,14 @@ const queryOwnerNft = async () => {
   const queryClient = new CosmWasmClient(httpUrl, false);
 
   const nftAddr = conf.get("nftAddr");
-  const player1NftId = conf.get('player1NftId');
+  const player1NftId = conf.get("player1NftId");
   if (nftAddr.length == 0) {
     console.log("no nft contract address in local state");
     return;
   }
 
-	console.log(player1NftId)
-	let queryMsg = { nft_info: { token_id:  player1NftId } };
+  console.log(player1NftId);
+  let queryMsg = { nft_info: { token_id: player1NftId } };
   let player1Nft = await queryClient.queryContractSmart(nftAddr, queryMsg);
 
   console.log("NFT ", JSON.stringify(player1Nft));

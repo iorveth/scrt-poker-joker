@@ -7,14 +7,12 @@ const {
 } = require("secretjs");
 
 const fs = require("fs");
-const conf = new (require('conf'))()
-const customFees = require("../util.js")
-
+const conf = new (require("conf"))();
+const customFees = require("../util.js");
 
 const deploy = async () => {
-
-    //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
-    const httpUrl = process.env.SECRET_REST_URL;
+  //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
+  const httpUrl = process.env.SECRET_REST_URL;
   const mnemonic = process.env.ADMIN_MNEMONIC;
   const signingPen = await Secp256k1Pen.fromMnemonic(mnemonic);
   const pubkey = encodeSecp256k1Pubkey(signingPen.pubkey);
@@ -28,9 +26,7 @@ const deploy = async () => {
     customFees
   );
 
-
-
-    // ---- Use Admin client to upload contracts ----
+  // ---- Use Admin client to upload contracts ----
   const daoWasm = fs.readFileSync("../pj-dao/contract.wasm");
   let uploadReceipt = await signClient.upload(daoWasm, {});
   const daoCodeId = uploadReceipt.codeId;
@@ -41,8 +37,7 @@ const deploy = async () => {
   const nftCodeId = uploadReceipt.codeId;
   console.log("uploaded nft wasm: ", nftCodeId);
 
-
-    // ---- Use Admin client to instantiate DAO ----
+  // ---- Use Admin client to instantiate DAO ----
   const nftContractCodeHash = await signClient.restClient.getCodeHashByCodeId(
     nftCodeId
   );
@@ -57,11 +52,10 @@ const deploy = async () => {
   );
 
   const daoAddr = daoContract.contractAddress;
-  conf.set('daoAddr', daoAddr);
+  conf.set("daoAddr", daoAddr);
   console.log("instantiated dao contract: ", daoAddr);
 
-
-    // ---- Use Admin client to instantiate NFT via DAO ----
+  // ---- Use Admin client to instantiate NFT via DAO ----
   const createContractMsg = {
     create_nft_contract: {},
   };
@@ -73,15 +67,13 @@ const deploy = async () => {
     console.log(e);
   }
 
-
-
-    // ----  Query DAO to get NFT contract address  and info ----
+  // ----  Query DAO to get NFT contract address  and info ----
   console.log("Querying dao contract for nft contract address");
   const nftAddr = await signClient.queryContractSmart(daoAddr, {
     nft_address: {},
   });
   console.log(`nftAddress: ${nftAddr}`);
-  conf.set('nftAddr', nftAddr);
+  conf.set("nftAddr", nftAddr);
 
   console.log(
     "Querying nft contract for contract info to ensure address is correct"
@@ -91,7 +83,6 @@ const deploy = async () => {
   });
 
   console.log(`nftInfo: `, nftInfo);
-
 };
 
-module.exports = deploy
+module.exports = deploy;
