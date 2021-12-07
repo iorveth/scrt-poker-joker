@@ -1,12 +1,39 @@
-# scrt-poker-joker
+# Poker Joker DAO
 
-Scrt Poker Joker is a multiplayer dice game implemented on the Scrt Network.
+Poker Joker DAO is a gaming DAO designed to manage games that provide ownership to players (DAO membership) and utilities for gaming assets (NFTs).
+
+The current version is build for Hackatom VI.
+
+In this version, the game that is support is a multiplayer dice game implemented on the Secret Network.
+The Secret Network allows for onchain randomness and privacy features that are unique to make this game possible.
+The players of the game roll their own sets of dice, which are represented by Secret NFTs (SNIP-721).
+The owner of the dice NFT, depending on the attributes of the NFT, may have different privilledges in the game.
+
 This is inspired by a mini game in the [Sea Dogs] game series.
 It is similar, yet more simple than Poker dice.
 
-The players of the game role their own sets of dice, which are represented by Secret NFTs (SNIP-721).
-The owner of the dice NFT, depending on the attributes of the NFT, may have different privilledges.
+[sea dogs]: https://www.gamepressure.com/games/sea-dogs-to-each-his-own/ze52a6
 
+## Design guidelines
+
+We strive for the Poker Joker Dice game to be fun and simple, however, our design of the smart contracts was guided by a few principles that we value:
+
+1. _Aligning NFT value with utility_: By linking the dice NFTs `xp` level (earned by playing) to the `base bet` amount,
+   we providing a correlation between the NFT itself and the potential winnings (via [xp-table]) of an NFT in the game.
+   This is important as it captures the skills of the previous owners of the NFT and encourages future engagement with the game.
+
+2. _Easy onboarding for adoption_: We implemented collateralisation of Dice NFT so that first time users can play the game without specifically needing PJ Dao token (to be implemented) or network gas (with the incoming [feegrant] in the cosmos-sdk and other gas station implmentations).
+
+3. _Decentralised gaming and governance_: As a Peer-to-Peer facility for gaming, this facilitates a fair chance for everyone to win (as opposed to casinos).
+   Futhermore, the gamers should govern the organisation.
+   For example, in this MVP, the DAO contract is currently responsible to mint and collateralisation of the NFTs.
+   Such decisions, along with the scoring table will be voted by the gamers themselves.
+
+[feegrant]: https://github.com/cosmos/cosmos-sdk/blob/v0.44.5/CHANGELOG.md#v0430---2021-08-10
+
+### Message flow diagram
+
+<<<<<<< HEAD
 [sea dogs]: https://www.gamepressure.com/games/sea-dogs-to-each-his-own/ze52a6
 
 ## Design guidelines
@@ -21,27 +48,42 @@ As fun and simple Scrt Poker Joker strive to be, the design of this game was bui
    As the game develops, such decisions, along with the scoring table will be voted by the gamers themselves.
 
 [feegrant]: https://github.com/cosmos/cosmos-sdk/blob/v0.44.5/CHANGELOG.md#v0430---2021-08-10
+=======
+---
+>>>>>>> c6dde358203424569c02878233404bf5298dd892
 
-## Poker Joker Rules
+## Poker Joker Dice Game Rules
 
 ### Set up
 
-- the total number of dice per player is 5
+- 5 Dice per player
 - there is a base bet value per die in the game (set by the initiator, more on this later)
-- the initial total stake is number of players x base bet x 5 x 2 (number of dice per player x 2 rounds )
+- each player lock fund in a pool `base bet * number of dice * 2`; `2` because each player can roll max all dice twice
 
 ### Play
 
+- on each roll, fund is withdrawn from the players' pools to the stake
 - each player takes turn to roll all 5 dice in their initial roll
 - after each initiall roll, each player can reroll an arbitrary number of die/dices: _r_ (up to 5) once
-- if the player decides to reroll, they must place _base bet x r_ to the total stake
+- if the player decides to reroll
 - after all players have had their initial (optional reroll), the player with the highest score wins
+- any remaining funds in the pools are returned to the player
+- all stake are transfered to the winner
 
+<<<<<<< HEAD
 There are two modes for play in scrt poker joker, the clear and shielded mode (to be implemented).
 
 - **Clear mode:** each player does their initial roll and the result of that roll can be observed by all the other players in the game
 - **Shielded mode:** the other players cannot see what the shielded player have rolled but only that they have / have not rerolled.
   Naturally if a player is using the shielded mode, it is unlikely that an unshielded player will opt in to play.
+=======
+#### Modes
+
+There are two modes for play in Poker Joker, the clear and shielded mode (to be implemented).
+
+- **Clear mode:** Using Secret Network Randomness feature - each player does their initial roll and the result of that roll can be observed by all the other players in the game.
+- **Shielded mode (Coming Soon):** Using Secret Network Privacy feature - the other players cannot see what the shielded player have rolled but only that they have / have not rerolled. Naturally if a player is using the shielded mode, it is unlikely that an unshielded player will opt in to play.
+>>>>>>> c6dde358203424569c02878233404bf5298dd892
 
 #### Scoring
 
@@ -69,6 +111,7 @@ In order to align the value of the Dice NFT with their utility, we have initiall
 
 ### XP Table
 
+<<<<<<< HEAD
 |     Point | Base Bet | Access to Shielded Game |
 | --------: | -------: | ----------------------: |
 |     < 100 |   1 Scrt |                      No |
@@ -79,6 +122,14 @@ In order to align the value of the Dice NFT with their utility, we have initiall
 ### Message flow diagram
 
 // TODO
+=======
+|   Point | Base Bet | Access to Shielded Game |
+| ------: | -------: | ----------------------: |
+|    < 10 |   1 Scrt |                      No |
+| 10 < 20 |   2 Scrt |                      No |
+| 20 < 40 |   4 Scrt |                     Yes |
+|    40 + |   8 Scrt |                     Yes |
+>>>>>>> c6dde358203424569c02878233404bf5298dd892
 
 ## DAO-like voting (TBC)
 

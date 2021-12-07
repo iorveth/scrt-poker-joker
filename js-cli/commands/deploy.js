@@ -7,12 +7,14 @@ const {
 } = require("secretjs");
 
 const fs = require("fs");
-const conf = new (require("conf"))();
-const customFees = require("../util.js");
+const conf = new (require('conf'))()
+const customFees = require("../util.js")
+
 
 const deploy = async () => {
-  //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
-  const httpUrl = process.env.SECRET_REST_URL;
+
+    //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
+    const httpUrl = process.env.SECRET_REST_URL;
   const mnemonic = process.env.ADMIN_MNEMONIC;
   const signingPen = await Secp256k1Pen.fromMnemonic(mnemonic);
   const pubkey = encodeSecp256k1Pubkey(signingPen.pubkey);
