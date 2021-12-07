@@ -314,6 +314,10 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
 
         (messages, log)
     } else {
+        
+        // save updated game state
+        save_game(&mut deps.storage, game_id, &game_details)?;
+
         let log = vec![log(
             "rerolled",
             format!("game_id {} \n {:?} ", game_id, game_json),
