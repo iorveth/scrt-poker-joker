@@ -6,9 +6,8 @@ use crate::msg::{
 };
 use crate::state::{
     load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash, nft_code_id,
-    remove_game, save_game, save_joiner, save_last_game_index, save_nft_address, save_nft_code_hash,
-    save_nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
-
+    remove_game, save_game, save_joiner, save_last_game_index, save_nft_address,
+    save_nft_code_hash, save_nft_code_id, PREFIX_LAST_GAME_INDEX, PREFIX_NFT_CONTRACT,
 };
 use cosmwasm_std::{
     coin, has_coins, log, to_binary, Api, BankMsg, Binary, BlockInfo, CanonicalAddr, Coin,
@@ -16,6 +15,7 @@ use cosmwasm_std::{
     LogAttribute, Order, Querier, QueryRequest, QueryResult, ReadonlyStorage, StdError, StdResult,
     Storage, WasmMsg, WasmQuery, KV,
 };
+use secret_toolkit::serialization::{Json, Serde};
 use std::convert::TryInto;
 
 pub type GameId = u64;
@@ -122,7 +122,7 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
         }
         Ok(HandleResponse {
             messages: response_msg,
-            log: vec![log("joined", env.message.sender)],
+            log: vec![log("member joined dao", env.message.sender)],
             data: None,
         })
     } else {
@@ -137,7 +137,11 @@ pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
     env: Env,
 ) -> ContractResult<HandleResponse> {
     save_nft_address(&mut deps.storage, &env.message.sender)?;
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![log("nft address saved", env.message.sender)],
+        data: None,
+    })
 }
 
 pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
@@ -172,7 +176,7 @@ pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![instantiate_msg],
-        log: vec![],
+        log: vec![log("nft contract created", code_id)],
         data: None,
     })
 }
@@ -194,7 +198,7 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     let game_id = load_last_game_index(&deps.storage)?;
 
     // create new game with provided host player secret
-    let game = Game::new(env.message.sender, nft_id, base_bet);
+    let game = Game::new(env.message.sender.clone(), nft_id, base_bet);
     let game_details = GameDetails::new(game, secret.to_be_bytes());
 
     // save newly initialized game
@@ -205,7 +209,7 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
+        log: vec![log("game room created, id: ", game_id)],
         data: None,
     })
 }
@@ -238,7 +242,7 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
+        log: vec![log("joined the game", game_id)],
         data: None,
     })
 }
@@ -262,10 +266,15 @@ pub fn roll<S: Storage, A: Api, Q: Querier>(
     // save updated game state
     save_game(&mut deps.storage, game_id, &game_details)?;
 
+    let game_json = Json::serialize(&Game::from(game_details))?;
+
     // check whether player can roll
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
+        log: vec![log(
+            "rolled",
+            format!("game_id {} \n {:#?} ", game_id, game_json),
+        )],
         data: None,
     })
 }
@@ -287,22 +296,34 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
 
     game_details.reroll(game_id, dices);
 
+    let game_json = Json::serialize(&Game::from(game_details.clone()))?;
+
     // determine a winner and get bank messages after game completion
-    let messages = if game_details.is_finished() {
+    let (messages, log) = if game_details.is_finished() {
         // determine a winner and complete payments
         let messages = game_details.complete_checkout(env.contract.address);
 
         // remove game after completion
         remove_game(&mut deps.storage, game_id);
 
-        messages
+        let log = vec![log(
+            "game completed",
+            format!("game_id {} \n {:#?} ", game_id, game_json),
+        )];
+
+        (messages, log)
     } else {
-        vec![]
+        let log = vec![log(
+            "rerolled",
+            format!("game_id {} \n {:#?} ", game_id, game_json),
+        )];
+
+        (vec![], log)
     };
 
     Ok(HandleResponse {
         messages,
-        log: vec![],
+        log,
         data: None,
     })
 }

@@ -98,7 +98,7 @@ pub fn complete_reroll(
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema, Clone, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct GameDetails {
     // information about the game
@@ -411,7 +411,7 @@ impl GameDetails {
 }
 
 // We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema, Clone, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct Game {
     pub status: GameStatus,
