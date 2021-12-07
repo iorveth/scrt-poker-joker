@@ -24,8 +24,10 @@ We strive for the Poker Joker Dice game to be fun and simple, however, our desig
 
 2. _Easy onboarding for adoption_: We implemented collateralisation of Dice NFT so that first time users can play the game without specifically needing PJ Dao token (to be implemented) or network gas (with the incoming [feegrant] in the cosmos-sdk and other gas station implmentations).
 
-3. _Decentralised governance_: In this MVP, the DAO contract is currently responsible to mint and collateralisation of the NFTs.
-   As the game develops, such decisions, along with the scoring table will be voted by the gamers themselves.
+3. _Decentralised gaming and governance_: As a Peer-to-Peer facility for gaming, this facilitates a fair chance for everyone to win (as opposed to casinos).
+   Futhermore, the gamers should govern the organisation.
+   For example, in this MVP, the DAO contract is currently responsible to mint and collateralisation of the NFTs.
+   Such decisions, along with the scoring table will be voted by the gamers themselves.
 
 [feegrant]: https://github.com/cosmos/cosmos-sdk/blob/v0.44.5/CHANGELOG.md#v0430---2021-08-10
 
@@ -39,15 +41,17 @@ We strive for the Poker Joker Dice game to be fun and simple, however, our desig
 
 - 5 Dice per player
 - there is a base bet value per die in the game (set by the initiator, more on this later)
-- the initial total stake is number of players x base bet x number of dice x 2 ( first roll and reroll can be up to all dice )
+- each player lock fund in a pool `base bet * number of dice * 2`; `2` because each player can roll max all dice twice
 
 ### Play
 
+- on each roll, fund is withdrawn from the players' pools to the stake
 - each player takes turn to roll all 5 dice in their initial roll
 - after each initiall roll, each player can reroll an arbitrary number of die/dices: _r_ (up to 5) once
 - if the player decides to reroll
 - after all players have had their initial (optional reroll), the player with the highest score wins
-- any stake on top of the `base bet * total dice rolled` will be return to the player
+- any remaining funds in the pools are returned to the player
+- all stake are transfered to the winner
 
 #### Modes
 
