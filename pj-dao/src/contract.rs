@@ -22,6 +22,7 @@ pub type GameId = u64;
 
 pub type Secret = u64;
 
+/// Initial game index
 pub const INIT_INDEX: GameId = 0;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(

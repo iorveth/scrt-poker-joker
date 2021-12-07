@@ -80,7 +80,7 @@ pub fn calculate_player_total_points(roll: [u8; NUM_OF_DICES]) -> u8 {
     }
 }
 
-/// Reroll cchosen dices
+/// Reroll chosen dices
 pub fn complete_reroll(
     rng: &mut ChaChaRng,
     mut roll: [u8; NUM_OF_DICES],
@@ -354,7 +354,7 @@ impl GameDetails {
                     self.game.host_player_rolls[1] = self.game.host_player_rolls[0];
                 } else {
                     // reroll chosen dices
-                    let reroll = complete_reroll(&mut rng, self.game.joined_player_rolls[0], dices);
+                    let reroll = complete_reroll(&mut rng, self.game.host_player_rolls[0], dices);
                     self.game.host_player_rolls[1] = reroll;
                     self.game.host_player_total_points = calculate_player_total_points(reroll);
                 }
