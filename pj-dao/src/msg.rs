@@ -34,6 +34,9 @@ pub enum HandleMsg {
         game_id: GameId,
         dices: [bool; NUM_OF_DICES],
     },
+    EndGame {
+        game_id: GameId,
+    },
     JoinDao {
         nft: Option<JoinNftDetails>,
     },

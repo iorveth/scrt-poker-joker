@@ -28,4 +28,8 @@ pub enum ContractError {
     AlreadyHasNFTContract {},
     #[error("NotAdmin")]
     NotAdmin {},
+    #[error("GameIsNotFinsihed")]
+    GameIsNotFinsihed {},
+    #[error("NotAPlayer")]
+    NotAPlayer {},
 }
