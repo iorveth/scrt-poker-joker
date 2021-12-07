@@ -5,7 +5,6 @@ const {
   SigningCosmWasmClient,
   pubkeyToAddress,
   encodeSecp256k1Pubkey,
-  encoding,
 } = require("secretjs");
 // const { toUtf8 }  = require("cosmjs/encoding");
 
