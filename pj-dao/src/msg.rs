@@ -1,8 +1,6 @@
 use crate::error::{ContractError, ContractResult};
-use crate::game::GameDetails;
-use crate::game::GameStatus;
-use crate::game::NUM_OF_DICES;
-use cosmwasm_std::{Api, Binary, Coin, HumanAddr, StdResult, StdError};
+use crate::game::{GameDetails, GameStatus, NUM_OF_DICES};
+use cosmwasm_std::{Binary, Coin, HumanAddr, StdError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -173,6 +171,16 @@ pub enum NftHandleMsg {
         /// optional public metadata that can be seen by everyone
         private_metadata: Option<Metadata>,
     },
+    SetMetadata {
+        /// id of the token whose metadata should be updated
+        token_id: String,
+        /// the optional new public metadata
+        public_metadata: Option<Metadata>,
+        /// the optional new private metadata
+        private_metadata: Option<Metadata>,
+        /// optional message length padding
+        padding: Option<String>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -191,6 +199,10 @@ pub enum NftQueryAnswer {
     TokenList {
         tokens: Vec<String>,
     },
+    NftInfo {
+        token_uri: Option<String>,
+        extension: Option<Extension>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -204,6 +216,8 @@ pub enum NftQueryMsg {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
+    /// displays the public metadata of a token
+    NftInfo { token_id: String },
     /// displays a list of all the tokens belonging to the input owner in which the viewer
     /// has view_owner permission
     Tokens {
@@ -284,8 +298,8 @@ impl Extension {
 
         let enough_xp = match self.xp {
             0..=10 => base_bet_amount == 1,
-            10..=20 => base_bet_amount <= 2,
-            20..=40 => base_bet_amount <= 4,
+            11..=20 => base_bet_amount <= 2,
+            21..=40 => base_bet_amount <= 4,
             _ => base_bet_amount <= 8,
         };
 
