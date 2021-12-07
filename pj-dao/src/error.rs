@@ -22,4 +22,6 @@ pub enum ContractError {
     AlreadyJoined {},
     #[error("QueryPlayerNotValid")]
     QueryPlayerNotValid {},
+    #[error("NotEnoughXpForTheBaseBet")]
+    NotEnoughXpForTheBaseBet {},
 }

@@ -1,10 +1,10 @@
+use crate::error::{ContractError, ContractResult};
 use crate::game::GameDetails;
-use cosmwasm_std::{Api, Binary, Coin, HumanAddr, StdResult};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use crate::game::GameStatus;
 use crate::game::NUM_OF_DICES;
+use cosmwasm_std::{Api, Binary, Coin, HumanAddr, StdResult, StdError};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::contract::{GameId, Secret};
 
@@ -275,6 +275,28 @@ pub struct Extension {
     /// a select list of trait_types that are in the private metadata.  This will only ever be used
     /// in public metadata
     pub protected_attributes: Option<Vec<String>>,
+}
+
+impl Extension {
+    /// Ensure NFT has enough XP for a game with a given base bet
+    pub fn ensure_enough_xp_for_the_base_bet(&self, base_bet: &Coin) -> ContractResult<()> {
+        let base_bet_amount = base_bet.amount.u128();
+
+        let enough_xp = match self.xp {
+            0..=10 => base_bet_amount == 1,
+            10..=20 => base_bet_amount <= 2,
+            20..=40 => base_bet_amount <= 4,
+            _ => base_bet_amount <= 8,
+        };
+
+        if !enough_xp {
+            Err(StdError::generic_err(
+                ContractError::NotEnoughXpForTheBaseBet {}.to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// attribute trait
