@@ -16,7 +16,6 @@ use cosmwasm_std::{
     Storage, WasmMsg, WasmQuery, KV,
 };
 use std::convert::TryInto;
-use std::os::unix::prelude::OsStrExt;
 
 pub type GameId = u64;
 
@@ -86,7 +85,7 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
 ) -> ContractResult<HandleResponse> {
     // TODO: charge user?
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let is_joined = load_joiner(&deps.storage, sender_raw)?;
+    let is_joined = load_joiner(&deps.storage, &sender_raw)?;
 
     if is_joined == None {
         let mut response_msg: Vec<CosmosMsg> = vec![];
@@ -95,38 +94,39 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
         // in order to check, dao must be provided the viewing key, at least this once
         if let Some(nft) = nft {
             // check this belongs to the user
+            // TODO query
             let query = WasmQuery::Smart {
                 contract_addr: nft_address(&deps.storage)?,
                 callback_code_hash: nft_code_hash(&deps.storage)?,
                 msg: to_binary(&NftQueryMsg::OwnerOf {
                     token_id: nft.id,
                     viewer: Some(ViewerInfo {
-                        address: env.message.sender,
-                        viewing_key: nft.viewing_key,
+                        address: env.message.sender.clone(),
+                        viewing_key: nft.viewing_key.clone(),
                     }),
                     include_expired: None,
                 })?,
             };
-            save_joiner(&mut deps.storage, sender_raw, nft.viewing_key)?;
+            save_joiner(&mut deps.storage, &sender_raw, nft.viewing_key)?;
         } else {
             // we will mint a new nft for the owner
-            let viewing_key = String::from_utf8(
-                [
+            let viewing_key = String::from_utf8_lossy(
+                &[
                     env.message.sender.0.as_bytes(),
                     &env.block.time.to_be_bytes(),
                 ]
                 .concat(),
             )
-            .map_err(|e| StdError::generic_err(e.to_string()))?;
+            .into_owned();
 
             let mint_dice_msg = NftHandleMsg::MintDiceNft {
                 owner: Some(env.message.sender.clone()),
-                key: viewing_key,
+                key: viewing_key.clone(),
                 private_metadata: None,
             };
 
             // save the new joiner's viewing key
-            save_joiner(&mut deps.storage, sender_raw, viewing_key)?;
+            save_joiner(&mut deps.storage, &sender_raw, viewing_key)?;
 
             let contract_addr = nft_address(&deps.storage)?;
             let callback_code_hash = nft_code_hash(&deps.storage)?;

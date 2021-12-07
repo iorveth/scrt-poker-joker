@@ -5,10 +5,12 @@ const {
   SigningCosmWasmClient,
   pubkeyToAddress,
   encodeSecp256k1Pubkey,
+  encoding,
 } = require("secretjs");
+// const { toUtf8 }  = require("cosmjs/encoding");
 
-const conf = new (require('conf'))()
-const customFees = require("../util.js")
+const conf = new (require("conf"))();
+const customFees = require("../util.js");
 
 const joinDao = async () => {
   const httpUrl = process.env.SECRET_REST_URL;
@@ -25,14 +27,15 @@ const joinDao = async () => {
     customFees
   );
 
-const daoAddr = conf.get('daoAddr');
-    console.log("dao address: ", daoAddr)
-  const joinDaoMsg = { join_dao: { nft: "" } };
+  const daoAddr = conf.get("daoAddr");
+  console.log("dao address: ", daoAddr);
+  const joinDaoMsg = { join_dao: { nft: null } };
   let r = await player1Client.execute(daoAddr, joinDaoMsg);
   console.log("joined Dao and mint: ", JSON.stringify(r));
-  const wasmEvent = r.logs[0].events.pop()
-  let player1NftId = wasmEvent.attributes[wasmEvent.attributes.length - 1].value
+  const wasmEvent = r.logs[0].events.pop();
+  let player1NftId =
+    wasmEvent.attributes[wasmEvent.attributes.length - 1].value;
   console.log("Player 1 NFT ID: ", player1NftId);
-conf.set('player1NftId', player1NftId.trim())
+  conf.set("player1NftId", player1NftId.trim());
 };
-module.exports = joinDao 
+module.exports = joinDao;
