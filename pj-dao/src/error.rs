@@ -36,4 +36,6 @@ pub enum ContractError {
     BaseBetCanNotBeZero {},
     #[error("DidNotJoinDao")]
     DidNotJoinDao {},
+    #[error("PlayerCannotAccessProvidedNft")]
+    PlayerCannotAccessProvidedNft {},
 }

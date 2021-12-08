@@ -228,7 +228,13 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
     // Ensure given account joined dao, retrieve it's nfts.
-    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender);
+    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender)?;
+
+    // Ensure given nft belongs to player
+    ensure_can_access_nft(player_nfts, &nft_id)?;
+
+    // Ensure player can use given nft in a game
+    ensure_can_use_nft_in_a_game(deps, nft_id.clone(), &base_bet)?;
 
     // check whether nft supports base_bet
 
@@ -265,13 +271,21 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
     // Ensure given account joined dao, retrieve it's nfts.
-    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender);
+    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender)?;
+
+    // Ensure given nft belongs to player
+    ensure_can_access_nft(player_nfts, &nft_id)?;
 
     // ensure game exists
     let mut game_details = load_game(&deps.storage, game_id)?;
 
+    let base_bet = game_details.game.base_bet.clone();
+
+    // Ensure player can use given nft in a game
+    ensure_can_use_nft_in_a_game(deps, nft_id.clone(), &base_bet)?;
+
     // ensure enough coins provided
-    ensure_has_coins_for_game(&env, &game_details.game.base_bet)?;
+    ensure_has_coins_for_game(&env, &base_bet)?;
 
     // ensure game status is set to pending
     game_details.ensure_is_pending()?;
@@ -571,6 +585,44 @@ pub fn ensure_is_not_a_dao_member<S: Storage>(
         .ok_or(StdError::generic_err(
             ContractError::AlreadyJoinedDao {}.to_string(),
         ))
+}
+
+/// Ensure provided NFT is in a set of NFTs
+pub fn ensure_can_access_nft(player_tokens: Vec<String>, token_id: &str) -> ContractResult<()> {
+    if player_tokens
+        .iter()
+        .any(|player_token| *player_token == *token_id)
+    {
+        Ok(())
+    } else {
+        Err(StdError::generic_err(
+            ContractError::PlayerCannotAccessProvidedNft {}.to_string(),
+        ))
+    }
+}
+
+/// Ensure given nft can be used in a game
+pub fn ensure_can_use_nft_in_a_game<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    token_id: String,
+    base_bet: &Coin,
+) -> ContractResult<()> {
+    let nft_info = query_nft_info_by_id(deps, token_id)?;
+    if let NftQueryAnswer::NftInfo {
+        token_uri,
+        extension,
+    } = nft_info
+    {
+        if let Some(extension) = extension {
+            extension.ensure_enough_xp_for_the_base_bet(base_bet)
+        } else {
+            Err(StdError::generic_err("NFT extension is not set"))
+        }
+    } else {
+        Err(StdError::generic_err(
+            "unable to get NftInfo from nft contract",
+        ))
+    }
 }
 
 /// Get `MintDiceNft` handle message from the parameters provided
