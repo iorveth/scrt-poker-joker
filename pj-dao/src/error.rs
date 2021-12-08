@@ -18,8 +18,8 @@ pub enum ContractError {
     GameNotInRerollStatus {},
     #[error("GivenAccountCannotMakeARoll")]
     GivenAccountCannotMakeARoll {},
-    #[error("AlreadyJoined")]
-    AlreadyJoined {},
+    #[error("AlreadyJoinedDao")]
+    AlreadyJoinedDao {},
     #[error("QueryPlayerNotValid")]
     QueryPlayerNotValid {},
     #[error("NotEnoughXpForTheBaseBet")]
@@ -34,4 +34,8 @@ pub enum ContractError {
     NotAPlayer {},
     #[error("BaseBetCanNotBeZero")]
     BaseBetCanNotBeZero {},
+    #[error("DidNotJoinDao")]
+    DidNotJoinDao {},
+    #[error("PlayerCannotAccessProvidedNft")]
+    PlayerCannotAccessProvidedNft {},
 }
