@@ -66,6 +66,10 @@ pub enum QueryMsg {
         player: HumanAddr,
         viewer: HumanAddr,
     },
+    // retrieve nft info by it's token_id
+    NftInfo {
+        token_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]

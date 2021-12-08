@@ -381,7 +381,7 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
             Player::Joined => game_details.game.joined_player_nft_id.clone(),
         };
 
-        let winner_nft_metadata = query_nft_by_id(deps, &token_id)?;
+        let winner_nft_metadata = query_nft_info_by_id(deps, token_id.clone())?;
 
         let new_ext = if let NftQueryAnswer::NftInfo {
             token_uri,
@@ -452,6 +452,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::PlayerNfts { player, viewer } => {
             to_binary(&query_player_nfts(deps, &player, &viewer)?)
         }
+        QueryMsg::NftInfo { token_id } => to_binary(&query_nft_info_by_id(deps, token_id)?),
     }
 }
 
@@ -527,15 +528,18 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-/// Query nft by it's id
-fn query_nft_by_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, token_id: &str) -> StdResult<NftQueryAnswer> {
+/// Query nft info by it's id
+fn query_nft_info_by_id<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    token_id: String,
+) -> StdResult<NftQueryAnswer> {
     deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr: nft_address(&deps.storage)?,
         /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
         /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
         callback_code_hash: nft_code_hash(&deps.storage)?,
         /// msg is the json-encoded QueryMsg struct
-        msg: to_binary(&NftQueryMsg::NftInfo { token_id: token_id.to_owned() })?,
+        msg: to_binary(&NftQueryMsg::NftInfo { token_id: token_id })?,
     }))
 }
 
