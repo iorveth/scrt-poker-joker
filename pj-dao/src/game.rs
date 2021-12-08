@@ -145,6 +145,7 @@ impl GameDetails {
         match host_player_dices_sum.cmp(&joined_player_dices_sum) {
             Ordering::Greater => Some(Player::Host),
             Ordering::Less => Some(Player::Joined),
+            // draw
             Ordering::Equal => None,
         }
     }
@@ -432,6 +433,7 @@ impl GameDetails {
         address: HumanAddr,
         winner: Option<Player>,
     ) -> ContractResult<()> {
+        // if draw reached, anyone can complete a game
         let can_complete_a_game = match winner {
             Some(Player::Host) => address == self.game.host_player_address,
             Some(Player::Joined) => address == self.game.joined_player_address,
