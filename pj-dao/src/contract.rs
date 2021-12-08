@@ -1,8 +1,8 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, Game, GameDetails, GameStatus, Player, NUM_OF_DICES};
 use crate::msg::{
-    HandleMsg, InitMsg, JoinNftDetails, Metadata, MintDiceNft, NftHandleMsg, NftInfo, NftInitMsg,
-    NftQueryAnswer, NftQueryMsg, PostInitCallback, QueryMsg, SetMetadata, ViewerInfo,
+    HandleMsg, InitMsg, JoinNftDetails, Metadata, NftHandleMsg, NftInitMsg, NftQueryAnswer,
+    NftQueryMsg, PostInitCallback, QueryMsg, ViewerInfo,
 };
 use crate::state::{
     load_admin, load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash,
@@ -57,12 +57,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         } => join_game(deps, env, nft_id, game_id, secret),
         HandleMsg::Roll { game_id } => roll(deps, env, game_id),
         HandleMsg::ReRoll { game_id, dices } => reroll(deps, env, game_id, dices),
-        HandleMsg::AdminMint(admin_mint_data) => admin_mint(
-            deps,
-            env,
-            admin_mint_data.to,
-            admin_mint_data.private_metadata,
-        ),
+        HandleMsg::AdminMint { to, private_metadata } => admin_mint(deps, env, to, private_metadata),
         HandleMsg::EndGame { game_id } => end_game(deps, env, game_id),
     }
 }
@@ -179,13 +174,13 @@ fn mint_dice_nft_handle_msg(
         String::from_utf8_lossy(&[mint_to.0.as_bytes(), &block_time.to_be_bytes()].concat())
             .into_owned();
 
-    let mint_dice_msg = Box::new(MintDiceNft {
-        owner: mint_to.clone(),
+    let mint_dice_msg = NftHandleMsg::MintDiceNft {
+        owner: mint_to.to_owned(),
         key: viewing_key.clone(),
         private_metadata,
-    });
+    };
 
-    (NftHandleMsg::MintDiceNft(mint_dice_msg), viewing_key)
+    (mint_dice_msg, viewing_key)
 }
 
 pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
@@ -250,8 +245,8 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     base_bet: Coin,
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
-    // Ensure given account joined dao, retrieve it's viewing key.
-    let nft_viewing_key = ensure_is_dao_member(deps, &env.message.sender)?;
+    // Ensure given account joined dao, retrieve it's nfts.
+    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender);
 
     // check whether nft supports base_bet
 
@@ -287,8 +282,8 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     game_id: GameId,
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
-    // Ensure given account joined dao, retrieve it's viewing key.
-    let nft_viewing_key = ensure_is_dao_member(deps, &env.message.sender)?;
+    // Ensure given account joined dao, retrieve it's nfts.
+    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender);
 
     // ensure game exists
     let mut game_details = load_game(&deps.storage, game_id)?;
@@ -417,12 +412,11 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
             }))?;
 
         let new_ext = match current_winner_metadata {
-            NftQueryAnswer::NftInfo(nft_info) => {
-                if let NftInfo {
-                    extension: Some(mut ext),
-                    ..
-                } = *nft_info
-                {
+            NftQueryAnswer::NftInfo {
+                token_uri,
+                extension,
+            } => {
+                if let Some(mut ext) = extension {
                     ext.xp += 5;
                     ext
                 } else {
@@ -436,7 +430,7 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
             }
         };
 
-        let set_metadata_msg = Box::new(SetMetadata {
+        let set_metadata_msg = NftHandleMsg::SetMetadata {
             token_id,
             public_metadata: Some(Metadata {
                 token_uri: None,
@@ -444,12 +438,12 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
             }),
             private_metadata: None,
             padding: None,
-        });
+        };
 
         Some(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: nft_address(&deps.storage)?,
             callback_code_hash: nft_code_hash(&deps.storage)?,
-            msg: to_binary(&NftHandleMsg::SetMetadata(set_metadata_msg))?,
+            msg: to_binary(&set_metadata_msg)?,
             send: vec![],
         }))
     } else {
@@ -486,7 +480,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::GamesByStatus { status } => to_binary(&query_games_by_status(deps, status)?),
         QueryMsg::NftAddress {} => to_binary(&query_nft_address(deps)?),
         QueryMsg::PlayerNfts { player, viewer } => {
-            to_binary(&query_player_nfts(deps, player, viewer)?)
+            to_binary(&query_player_nfts(deps, &player, &viewer)?)
         }
     }
 }
@@ -528,16 +522,16 @@ fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
 
 fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-    player: HumanAddr,
-    viewer: HumanAddr,
+    player: &HumanAddr,
+    viewer: &HumanAddr,
 ) -> StdResult<Vec<String>> {
     // Ensure given account joined dao, retrieve it's viewing key.
     let viewing_key = ensure_is_dao_member(deps, &player)?;
 
     let query = NftQueryMsg::Tokens {
-        owner: player,
+        owner: player.to_owned(),
         /// optional address of the querier if different from the owner
-        viewer: Some(viewer),
+        viewer: Some(viewer.to_owned()),
         /// optional viewing key
         viewing_key: Some(viewing_key),
         /// paginate by providing the last token_id received in the previous query
