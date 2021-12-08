@@ -375,54 +375,15 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
     let game_json = Json::serialize(&Game::from(game_details.clone()))?;
 
     // we need to increase nft xp if there is a winner
-    let set_metadata_msg = if let Some(winner) = winner {
-        let token_id = match winner {
-            Player::Host => game_details.game.host_player_nft_id.clone(),
-            Player::Joined => game_details.game.joined_player_nft_id.clone(),
-        };
-
-        let winner_nft_metadata = query_nft_info_by_id(deps, token_id.clone())?;
-
-        let new_ext = if let NftQueryAnswer::NftInfo {
-            token_uri,
-            extension,
-        } = winner_nft_metadata
-        {
-            if let Some(mut ext) = extension {
-                ext.xp += 5;
-                ext
-            } else {
-                return Err(StdError::generic_err("unable to set metadata with uri"));
-            }
-        } else {
-            return Err(StdError::generic_err(
-                "unable to get metadata from nft contract",
-            ));
-        };
-
-        let set_metadata_msg = NftHandleMsg::SetMetadata {
-            token_id,
-            public_metadata: Some(Metadata {
-                token_uri: None,
-                extension: Some(new_ext),
-            }),
-            private_metadata: None,
-            padding: None,
-        };
-
-        Some(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: nft_address(&deps.storage)?,
-            callback_code_hash: nft_code_hash(&deps.storage)?,
-            msg: to_binary(&set_metadata_msg)?,
-            send: vec![],
-        }))
+    let set_nft_metadata_msg = if let Some(winner) = winner {
+        Some(get_set_nft_metadata_msg(deps, &game_details, winner)?)
     } else {
         None
     };
 
     let mut messages = game_details.complete_checkout(env.contract.address, winner);
 
-    if let Some(msg) = set_metadata_msg {
+    if let Some(msg) = set_nft_metadata_msg {
         messages.push(msg);
     }
 
@@ -491,6 +452,7 @@ fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
         .collect()
 }
 
+/// Query all the player nfts by the provided viewer key
 fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     player: &HumanAddr,
@@ -628,4 +590,52 @@ fn mint_dice_nft_handle_msg(
     };
 
     (mint_dice_msg, viewing_key)
+}
+
+/// Get set_nft_metadata_msg from the parameters provided
+fn get_set_nft_metadata_msg<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    game_details: &GameDetails,
+    winner: Player,
+) -> StdResult<CosmosMsg> {
+    let token_id = match winner {
+        Player::Host => game_details.game.host_player_nft_id.clone(),
+        Player::Joined => game_details.game.joined_player_nft_id.clone(),
+    };
+
+    let winner_nft_metadata = query_nft_info_by_id(deps, token_id.clone())?;
+
+    let new_ext = if let NftQueryAnswer::NftInfo {
+        token_uri,
+        extension,
+    } = winner_nft_metadata
+    {
+        if let Some(mut ext) = extension {
+            ext.xp += 5;
+            ext
+        } else {
+            return Err(StdError::generic_err("unable to set metadata with uri"));
+        }
+    } else {
+        return Err(StdError::generic_err(
+            "unable to get metadata from nft contract",
+        ));
+    };
+
+    let set_metadata_msg = NftHandleMsg::SetMetadata {
+        token_id,
+        public_metadata: Some(Metadata {
+            token_uri: None,
+            extension: Some(new_ext),
+        }),
+        private_metadata: None,
+        padding: None,
+    };
+
+    Ok(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: nft_address(&deps.storage)?,
+        callback_code_hash: nft_code_hash(&deps.storage)?,
+        msg: to_binary(&set_metadata_msg)?,
+        send: vec![],
+    }))
 }
