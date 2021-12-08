@@ -40,6 +40,14 @@ pub enum HandleMsg {
     JoinDao {
         nft: Option<JoinNftDetails>,
     },
+    AdminMint(Box<AdminMint>),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct AdminMint {
+    pub to: HumanAddr,
+    pub private_metadata: Option<Metadata>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -167,23 +175,31 @@ pub struct InitConfig {
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NftHandleMsg {
-    MintDiceNft {
-        owner: HumanAddr,
-        /// viewing key set by the dao for this dice nft
-        key: String,
-        /// optional public metadata that can be seen by everyone
-        private_metadata: Option<Metadata>,
-    },
-    SetMetadata {
-        /// id of the token whose metadata should be updated
-        token_id: String,
-        /// the optional new public metadata
-        public_metadata: Option<Metadata>,
-        /// the optional new private metadata
-        private_metadata: Option<Metadata>,
-        /// optional message length padding
-        padding: Option<String>,
-    },
+    MintDiceNft(Box<MintDiceNft>),
+    SetMetadata(Box<SetMetadata>),
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct MintDiceNft {
+    pub owner: HumanAddr,
+    /// viewing key set by the dao for this dice nft
+    pub key: String,
+    /// optional public metadata that can be seen by everyone
+    pub private_metadata: Option<Metadata>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct SetMetadata {
+    /// id of the token whose metadata should be updated
+    pub token_id: String,
+    /// the optional new public metadata
+    pub public_metadata: Option<Metadata>,
+    /// the optional new private metadata
+    pub private_metadata: Option<Metadata>,
+    /// optional message length padding
+    pub padding: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -202,10 +218,14 @@ pub enum NftQueryAnswer {
     TokenList {
         tokens: Vec<String>,
     },
-    NftInfo {
-        token_uri: Option<String>,
-        extension: Option<Extension>,
-    },
+    NftInfo(Box<NftInfo>),
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct NftInfo {
+    pub token_uri: Option<String>,
+    pub extension: Option<Extension>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

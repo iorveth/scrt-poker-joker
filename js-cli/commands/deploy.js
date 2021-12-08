@@ -7,14 +7,12 @@ const {
 } = require("secretjs");
 
 const fs = require("fs");
-const conf = new (require('conf'))()
-const customFees = require("../util.js")
-
+const conf = new (require("conf"))();
+const customFees = require("../util.js");
 
 const deploy = async () => {
-
-    //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
-    const httpUrl = process.env.SECRET_REST_URL;
+  //  ---- Creating Admin wallet for contract deployment (store + instantiate) ----
+  const httpUrl = process.env.SECRET_REST_URL;
   const mnemonic = process.env.ADMIN_MNEMONIC;
   const signingPen = await Secp256k1Pen.fromMnemonic(mnemonic);
   const pubkey = encodeSecp256k1Pubkey(signingPen.pubkey);
@@ -50,12 +48,25 @@ const deploy = async () => {
   const daoContract = await signClient.instantiate(
     daoCodeId,
     daoInitMsg,
-    "PokerJokerDAO" + Math.ceil(Math.random() * 10000)
+    "PokerJokerDAO" +
+      Math.ceil(Math.random() * 10000, "some memo", [
+        {
+          denom: "uscrt",
+          amount: String(1_000_000),
+        },
+      ])
   );
 
   const daoAddr = daoContract.contractAddress;
-  conf.set("daoAddr", daoAddr);
   console.log("instantiated dao contract: ", daoAddr);
+
+  // looks like instantiate sending fund does not work
+  let r = await signClient.sendTokens(daoAddr, [
+    { amount: String(1_000_000), denom: "uscrt" },
+  ]);
+  const daoAccount = await signClient.getAccount(daoAddr);
+  console.log("daoAccount: ", daoAccount);
+  conf.set("daoAddr", daoAddr);
 
   // ---- Use Admin client to instantiate NFT via DAO ----
   const createContractMsg = {

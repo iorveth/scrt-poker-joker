@@ -6,14 +6,14 @@ const {
   pubkeyToAddress,
   encodeSecp256k1Pubkey,
 } = require("secretjs");
-// const { toUtf8 }  = require("cosmjs/encoding");
 
 const conf = new (require("conf"))();
 const customFees = require("../util.js");
 
-const joinDao = async () => {
+const joinDao = async (player, tokenId, viewingKey) => {
   const httpUrl = process.env.SECRET_REST_URL;
-  const player1 = process.env.PLAYER1_MNEMONIC;
+  const playerMnemonic = `PLAYER${player}_MNEMONIC`;
+  const player1 = process.env[playerMnemonic];
   const signingPen1 = await Secp256k1Pen.fromMnemonic(player1);
   const pubkey1 = encodeSecp256k1Pubkey(signingPen1.pubkey);
   const accAddress1 = pubkeyToAddress(pubkey1, "secret");
@@ -34,8 +34,8 @@ const joinDao = async () => {
   const wasmEvent = r.logs[0].events.pop();
   let player1NftId =
     wasmEvent.attributes[wasmEvent.attributes.length - 1].value;
-  console.log("Player 1 NFT ID: ", player1NftId);
-  conf.set("player1NftId", player1NftId.trim());
-  conf.set("player1Addr", accAddress1);
+  console.log(`Player ${player} NFT ID: `, player1NftId);
+  conf.set(`player${player}NftId`, player1NftId.trim());
+  conf.set(`player${player}Addr`, accAddress1);
 };
 module.exports = joinDao;

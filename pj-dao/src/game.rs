@@ -7,6 +7,7 @@ use rand_core::SeedableRng;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
 
 // total roll rounds
 const TOTAL_ROUNDS: usize = 2;
@@ -56,23 +57,18 @@ pub fn calculate_player_total_points(roll: [u8; NUM_OF_DICES]) -> u8 {
     // 5 points: 5 of 1s
     if results.iter().any(|item| *item == 5) {
         5
-
     // 4 points: straight (1-5)
-    } else if results.iter().all(|item| *item == 1) {
+    } else if results.iter().all(|item| *item == 1)
+        // 4 points: 3 of a kind + 1 pair
+        || (results.iter().any(|item| *item == 3) && results.iter().any(|item| *item == 2))
+    {
         4
-
-    // 4 points: 3 of a kind + 1 pair
-    } else if results.iter().any(|item| *item == 3) && results.iter().any(|item| *item == 2) {
-        4
-
     // 3 points: 3 of a kind
     } else if results.iter().any(|item| *item == 3) {
         3
-
     // 2 points: 2 pairs
     } else if results.iter().filter(|item| **item == 2).count() == 2 {
         2
-
     // 1 point: 1 pair (it seems that we can't have less)
     } else {
         1
@@ -146,23 +142,22 @@ impl GameDetails {
         let host_player_dices_sum: u8 = self.game.host_player_rolls[1].iter().sum();
         let joined_player_dices_sum: u8 = self.game.joined_player_rolls[1].iter().sum();
 
-        if host_player_dices_sum > joined_player_dices_sum {
-            Some(Player::Host)
-        } else if host_player_dices_sum < joined_player_dices_sum {
-            Some(Player::Joined)
-        } else {
-            None
+        match host_player_dices_sum.cmp(&joined_player_dices_sum) {
+            Ordering::Greater => Some(Player::Host),
+            Ordering::Less => Some(Player::Joined),
+            Ordering::Equal => None,
         }
     }
 
     // Determine a winner of the game
     pub fn determine_a_winner(&self) -> Option<Player> {
-        if self.game.host_player_total_points > self.game.joined_player_total_points {
-            Some(Player::Host)
-        } else if self.game.host_player_total_points < self.game.joined_player_total_points {
-            Some(Player::Joined)
-        } else {
-            self.pick_player_with_biggest_dices_sum()
+        let host_player_total_points = self.game.host_player_total_points;
+        let joined_player_total_points = self.game.joined_player_total_points;
+
+        match host_player_total_points.cmp(&joined_player_total_points) {
+            Ordering::Greater => Some(Player::Host),
+            Ordering::Less => Some(Player::Joined),
+            Ordering::Equal => self.pick_player_with_biggest_dices_sum(),
         }
     }
 
@@ -325,7 +320,7 @@ impl GameDetails {
     /// true - reroll
     pub fn reroll(&mut self, game_id: GameId, dices: [bool; NUM_OF_DICES]) {
         // Update pool
-        let num_of_dices = dices.iter().filter(|dice| **dice == true).count();
+        let num_of_dices = dices.iter().filter(|dice| **dice).count();
 
         self.add_stake(num_of_dices, self.game.roll_turn);
 
@@ -353,7 +348,7 @@ impl GameDetails {
         match self.game.roll_turn {
             Player::Host => {
                 // no dices to reroll
-                if dices.iter().all(|dice| *dice == false) {
+                if dices.iter().all(|dice| !(*dice)) {
                     self.game.host_player_rolls[1] = self.game.host_player_rolls[0];
                 } else {
                     // reroll chosen dices
@@ -366,7 +361,7 @@ impl GameDetails {
             }
             Player::Joined => {
                 // no dices to reroll
-                if dices.iter().all(|dice| *dice == false) {
+                if dices.iter().all(|dice| !(*dice)) {
                     self.game.joined_player_rolls[1] = self.game.joined_player_rolls[0];
                 } else {
                     // reroll chosen dices
