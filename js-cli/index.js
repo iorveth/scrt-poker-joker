@@ -5,6 +5,7 @@ const deploy = require("./commands/deploy.js")
 const joinDao = require("./commands/joinDao.js")
 const queryOwnerNft = require("./commands/queryOwnerNft.js")
 const transfer = require("./commands/transfer.js")
+const adminMint = require("./commands/adminMint.js")
 
 // Load environment variables
 require("dotenv").config({ path: `${__dirname}/../.env.dev` });
@@ -30,8 +31,8 @@ program
     .action(transfer)
 
 program
-    .command('adminMint <for>')
+    .command('adminMint <to>')
     .description('admin mint for')
-    .action(transfer)
+    .action(adminMint)
 
 program.parse();

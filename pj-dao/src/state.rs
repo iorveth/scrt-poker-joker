@@ -25,8 +25,8 @@ pub const PREFIX_NFT_CODE_ID: &[u8] = b"nftCodeId";
 /// prefix for the nft code hash
 pub const PREFIX_NFT_CODE_HASH: &[u8] = b"nftCodeHash";
 
-/// prefix for dao users
-pub const PREFIX_PLAYERS: &[u8] = b"players";
+/// prefix for the games
+pub const PREFIX_ADMIN: &[u8] = b"admin";
 
 // last game index
 pub fn save_last_game_index<'a, S: Storage>(storage: &'a mut S, index: &GameId) -> StdResult<()> {
@@ -38,6 +38,15 @@ pub fn load_last_game_index<'a, S: Storage>(storage: &'a S) -> StdResult<GameId>
     load(storage, PREFIX_LAST_GAME_INDEX)
 }
 
+// admin
+pub fn save_admin<'a, S: Storage>(storage: &'a mut S, admin: &HumanAddr) -> StdResult<()> {
+    save(storage, PREFIX_ADMIN, admin)
+}
+
+// readonly last game index
+pub fn load_admin<'a, S: Storage>(storage: &'a S) -> StdResult<HumanAddr> {
+    load(storage, PREFIX_ADMIN)
+}
 // supporting nft contract
 // currently only 1
 pub fn save_nft_address<'a, S: Storage>(

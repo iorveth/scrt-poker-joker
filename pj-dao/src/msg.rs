@@ -37,6 +37,10 @@ pub enum HandleMsg {
     JoinDao {
         nft: Option<JoinNftDetails>,
     },
+    AdminMint {
+        to: HumanAddr,
+        private_metadata: Option<Metadata>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
