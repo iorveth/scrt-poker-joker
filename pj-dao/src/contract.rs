@@ -618,11 +618,9 @@ pub fn ensure_is_not_a_dao_member<S: Storage>(
     storage: &S,
     player_raw: &CanonicalAddr,
 ) -> ContractResult<()> {
-    if load_joiner(storage, player_raw)?.is_none() {
-        Ok(())
-    } else {
-        Err(StdError::generic_err(
+    load_joiner(storage, player_raw)?
+        .map(|_| ())
+        .ok_or(StdError::generic_err(
             ContractError::AlreadyJoinedDao {}.to_string(),
         ))
-    }
 }
