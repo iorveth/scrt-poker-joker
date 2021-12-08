@@ -1,13 +1,13 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, Game, GameDetails, GameStatus, Player, NUM_OF_DICES};
 use crate::msg::{
-    HandleMsg, InitMsg, JoinNftDetails, Metadata, NftHandleMsg, NftInitMsg, NftQueryAnswer,
-    NftQueryMsg, PostInitCallback, QueryMsg, ViewerInfo,
+    HandleMsg, InitMsg, JoinNftDetails, Metadata, MintDiceNft, NftHandleMsg, NftInfo, NftInitMsg,
+    NftQueryAnswer, NftQueryMsg, PostInitCallback, QueryMsg, SetMetadata, ViewerInfo,
 };
 use crate::state::{
-    load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash, nft_code_id,
-    remove_game, save_game, save_joiner, save_last_game_index, save_nft_address,
-    save_nft_code_hash, save_nft_code_id,
+    load_admin, load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash,
+    nft_code_id, remove_game, save_admin, save_game, save_joiner, save_last_game_index,
+    save_nft_address, save_nft_code_hash, save_nft_code_id,
 };
 use cosmwasm_std::{
     has_coins, log, to_binary, Api, Binary, Coin, CosmosMsg, Env, Extern, HandleResponse,
@@ -25,12 +25,13 @@ pub const INIT_INDEX: GameId = 0;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
     save_last_game_index(&mut deps.storage, &INIT_INDEX)?;
     save_nft_code_hash(&mut deps.storage, msg.nft_code_hash)?;
     save_nft_code_id(&mut deps.storage, msg.nft_code_id)?;
+    save_admin(&mut deps.storage, &env.message.sender)?;
 
     Ok(InitResponse::default())
 }
@@ -56,7 +57,45 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         } => join_game(deps, env, nft_id, game_id, secret),
         HandleMsg::Roll { game_id } => roll(deps, env, game_id),
         HandleMsg::ReRoll { game_id, dices } => reroll(deps, env, game_id, dices),
+        HandleMsg::AdminMint(admin_mint_data) => admin_mint(
+            deps,
+            env,
+            admin_mint_data.to,
+            admin_mint_data.private_metadata,
+        ),
+        HandleMsg::EndGame { game_id } => end_game(deps, env, game_id),
     }
+}
+
+pub fn admin_mint<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    to: HumanAddr,
+    private_metadata: Option<Metadata>,
+) -> ContractResult<HandleResponse> {
+    ensure_is_admin(deps, &env.message.sender)?;
+    let (msg, viewing_key) = mint_dice_nft_handle_msg(&to, env.block.time, private_metadata);
+
+    save_joiner(
+        &mut deps.storage,
+        &deps.api.canonical_address(&to)?,
+        viewing_key,
+    )?;
+
+    let contract_addr = nft_address(&deps.storage)?;
+    let callback_code_hash = nft_code_hash(&deps.storage)?;
+    let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr,
+        callback_code_hash,
+        msg: to_binary(&msg)?,
+        send: vec![],
+    });
+
+    Ok(HandleResponse {
+        messages: vec![mint_msg],
+        log: vec![log("minted for: ", env.message.sender)],
+        data: None,
+    })
 }
 
 pub fn join_dao<S: Storage, A: Api, Q: Querier>(
@@ -74,8 +113,6 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
         // if a nft_id is provided, we check if msg.sender owns the nft
         // in order to check, dao must be provided the viewing key, at least this once
         if let Some(nft) = nft {
-            // check this belongs to the user
-            // TODO query
             let query = WasmQuery::Smart {
                 contract_addr: nft_address(&deps.storage)?,
                 callback_code_hash: nft_code_hash(&deps.storage)?,
@@ -88,23 +125,25 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
                     include_expired: None,
                 })?,
             };
+            let result: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(query))?;
+            let returned_owner = match result {
+                NftQueryAnswer::OwnerOf {
+                    owner,
+                    approvals: _,
+                } => owner,
+                _ => return Err(StdError::generic_err("Error parsing query results")),
+            };
+
+            if env.message.sender != returned_owner {
+                return Err(StdError::generic_err(
+                    "Not authorised to join with this nft",
+                ));
+            }
             save_joiner(&mut deps.storage, &sender_raw, nft.viewing_key)?;
         } else {
             // we will mint a new nft for the owner
-            let viewing_key = String::from_utf8_lossy(
-                &[
-                    env.message.sender.0.as_bytes(),
-                    &env.block.time.to_be_bytes(),
-                ]
-                .concat(),
-            )
-            .into_owned();
-
-            let mint_dice_msg = NftHandleMsg::MintDiceNft {
-                owner: env.message.sender.clone(),
-                key: viewing_key.clone(),
-                private_metadata: None,
-            };
+            let (msg, viewing_key) =
+                mint_dice_nft_handle_msg(&env.message.sender, env.block.time, None);
 
             // save the new joiner's viewing key
             save_joiner(&mut deps.storage, &sender_raw, viewing_key)?;
@@ -114,7 +153,7 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
             let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr,
                 callback_code_hash,
-                msg: to_binary(&mint_dice_msg)?,
+                msg: to_binary(&msg)?,
                 send: vec![],
             });
             response_msg.push(mint_msg);
@@ -129,6 +168,24 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
             ContractError::AlreadyJoined {}.to_string(),
         ))
     }
+}
+
+fn mint_dice_nft_handle_msg(
+    mint_to: &HumanAddr,
+    block_time: u64,
+    private_metadata: Option<Metadata>,
+) -> (NftHandleMsg, String) {
+    let viewing_key =
+        String::from_utf8_lossy(&[mint_to.0.as_bytes(), &block_time.to_be_bytes()].concat())
+            .into_owned();
+
+    let mint_dice_msg = Box::new(MintDiceNft {
+        owner: mint_to.clone(),
+        key: viewing_key.clone(),
+        private_metadata,
+    });
+
+    (NftHandleMsg::MintDiceNft(mint_dice_msg), viewing_key)
 }
 
 pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
@@ -147,19 +204,25 @@ pub fn create_nft_contract<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
 ) -> ContractResult<HandleResponse> {
+    if nft_address(&deps.storage).is_ok() {
+        return Err(StdError::generic_err(
+            ContractError::AlreadyHasNFTContract {}.to_string(),
+        ));
+    }
     let code_id = nft_code_id(&deps.storage)?;
     let callback_code_hash = nft_code_hash(&deps.storage)?;
+    let admin = load_admin(&deps.storage)?;
     let store_addr_msg = HandleMsg::StoreNftContract {};
     let post_init_callback = PostInitCallback {
         msg: to_binary(&store_addr_msg)?,
         contract_address: env.contract.address.clone(),
-        code_hash: env.contract_code_hash.clone(),
+        code_hash: env.contract_code_hash,
         send: vec![],
     };
     let nft_instantiate_msg = NftInitMsg {
         name: "PokerJokerNFT".into(),
         symbol: "PJX".into(),
-        admin: Some(env.contract.address),
+        admin: Some(admin),
         entropy: "HACKATOM IV".into(),
         royalty_info: None,
         config: None,
@@ -191,13 +254,16 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
 
     // check whether dao member
 
+    // ensure base bet is greater then zero
+    ensure_correct_base_bet(&base_bet)?;
+
     // ensure enough coins provided
     ensure_has_coins_for_game(&env, &base_bet)?;
 
     let game_id = load_last_game_index(&deps.storage)?;
 
     // create new game with provided host player secret
-    let game = Game::new(env.message.sender.clone(), nft_id, base_bet);
+    let game = Game::new(env.message.sender, nft_id, base_bet);
     let game_details = GameDetails::new(game, secret.to_be_bytes());
 
     // save newly initialized game
@@ -297,93 +363,112 @@ pub fn reroll<S: Storage, A: Api, Q: Querier>(
 
     let game_json = Json::serialize(&Game::from(game_details.clone()))?;
 
-    // determine a winner and get bank messages after game completion
-    let (messages, log) = if game_details.is_finished() {
-        // determine a winner and complete payments
-        let winner = game_details.determine_a_winner();
+    // save updated game state
+    save_game(&mut deps.storage, game_id, &game_details)?;
 
-        // we need to increase nft xp if there is a winner
-        let mut set_metadata_msg: Option<CosmosMsg> = None;
-        if winner.is_some() {
-            let token_id = match winner {
-                Some(Player::Host) => game_details.game.host_player_nft_id.clone(),
-                Some(Player::Joined) => game_details.game.joined_player_nft_id.clone(),
-                _ => unreachable!(),
-            };
+    let log = vec![log(
+        "rerolled",
+        format!("game_id {} \n {:?} ", game_id, game_json),
+    )];
 
-            let current_winner_metadata: NftQueryAnswer =
-                deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                    contract_addr: nft_address(&deps.storage)?,
-                    /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
-                    /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
-                    callback_code_hash: nft_code_hash(&deps.storage)?,
-                    /// msg is the json-encoded QueryMsg struct
-                    msg: to_binary(&NftQueryMsg::NftInfo {
-                        token_id: token_id.clone(),
-                    })?,
-                }))?;
+    Ok(HandleResponse {
+        messages: vec![],
+        log,
+        data: None,
+    })
+}
 
-            let new_ext = match current_winner_metadata {
-                NftQueryAnswer::NftInfo {
-                    token_uri,
-                    extension,
-                } => {
-                    if let Some(mut ext) = extension {
-                        ext.xp += 5;
-                        ext
-                    } else {
-                        return Err(StdError::generic_err("unable to set metadata with uri"));
-                    }
-                }
-                _ => {
-                    return Err(StdError::generic_err(
-                        "unable to get metadata from nft contract",
-                    ));
-                }
-            };
+pub fn end_game<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    game_id: GameId,
+) -> ContractResult<HandleResponse> {
+    // ensure game exists
+    let game_details = load_game(&deps.storage, game_id)?;
 
-            set_metadata_msg = Some(CosmosMsg::Wasm(WasmMsg::Execute {
+    // ensure game is finished and can be ended
+    game_details.ensure_is_finished()?;
+
+    // determine a winner and complete payments
+    let winner = game_details.determine_a_winner();
+
+    // Ensure actor can complete a game
+    game_details.ensure_can_complete_a_game(env.message.sender, winner)?;
+
+    let game_json = Json::serialize(&Game::from(game_details.clone()))?;
+
+    // we need to increase nft xp if there is a winner
+    let set_metadata_msg = if let Some(winner) = winner {
+        let token_id = match winner {
+            Player::Host => game_details.game.host_player_nft_id.clone(),
+            Player::Joined => game_details.game.joined_player_nft_id.clone(),
+        };
+
+        let current_winner_metadata: NftQueryAnswer =
+            deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
                 contract_addr: nft_address(&deps.storage)?,
+                /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
+                /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
                 callback_code_hash: nft_code_hash(&deps.storage)?,
-                msg: to_binary(&NftHandleMsg::SetMetadata {
-                    token_id,
-                    public_metadata: Some(Metadata {
-                        token_uri: None,
-                        extension: Some(new_ext),
-                    }),
-                    private_metadata: None,
-                    padding: None,
+                /// msg is the json-encoded QueryMsg struct
+                msg: to_binary(&NftQueryMsg::NftInfo {
+                    token_id: token_id.clone(),
                 })?,
-                send: vec![],
-            }));
-        }
+            }))?;
 
-        let mut messages = game_details.complete_checkout(env.contract.address, winner);
+        let new_ext = match current_winner_metadata {
+            NftQueryAnswer::NftInfo(nft_info) => {
+                if let NftInfo {
+                    extension: Some(mut ext),
+                    ..
+                } = *nft_info
+                {
+                    ext.xp += 5;
+                    ext
+                } else {
+                    return Err(StdError::generic_err("unable to set metadata with uri"));
+                }
+            }
+            _ => {
+                return Err(StdError::generic_err(
+                    "unable to get metadata from nft contract",
+                ));
+            }
+        };
 
-        if let Some(msg) = set_metadata_msg {
-            messages.push(msg);
-        }
+        let set_metadata_msg = Box::new(SetMetadata {
+            token_id,
+            public_metadata: Some(Metadata {
+                token_uri: None,
+                extension: Some(new_ext),
+            }),
+            private_metadata: None,
+            padding: None,
+        });
 
-        // remove game after completion
-        remove_game(&mut deps.storage, game_id);
-
-        let log = vec![log(
-            "game completed",
-            format!("game_id {} \n {:?} ", game_id, game_json),
-        )];
-
-        (messages, log)
+        Some(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: nft_address(&deps.storage)?,
+            callback_code_hash: nft_code_hash(&deps.storage)?,
+            msg: to_binary(&NftHandleMsg::SetMetadata(set_metadata_msg))?,
+            send: vec![],
+        }))
     } else {
-        // save updated game state
-        save_game(&mut deps.storage, game_id, &game_details)?;
-
-        let log = vec![log(
-            "rerolled",
-            format!("game_id {} \n {:?} ", game_id, game_json),
-        )];
-
-        (vec![], log)
+        None
     };
+
+    let mut messages = game_details.complete_checkout(env.contract.address, winner);
+
+    if let Some(msg) = set_metadata_msg {
+        messages.push(msg);
+    }
+
+    // remove game after completion
+    remove_game(&mut deps.storage, game_id);
+
+    let log = vec![log(
+        "game completed",
+        format!("game_id {} \n {:?} ", game_id, game_json),
+    )];
 
     Ok(HandleResponse {
         messages,
@@ -482,12 +567,38 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+fn ensure_is_admin<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: &HumanAddr,
+) -> ContractResult<()> {
+    let stored_admin = load_admin(&deps.storage)?;
+    if sender != &stored_admin {
+        Err(StdError::generic_err(
+            ContractError::NotAdmin {}.to_string(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 // Check whether given player provided max amount of coins, that can potentially be lost in the game
 pub fn ensure_has_coins_for_game(env: &Env, base_bet: &Coin) -> ContractResult<()> {
     // should be at least 10 x base_bet
     if !has_coins(&env.message.sent_funds, &locked_per_player(base_bet)) {
         Err(StdError::generic_err(
             ContractError::NotEnoughTokensForTheGame {}.to_string(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Ensure base bet is greater then zero
+pub fn ensure_correct_base_bet(base_bet: &Coin) -> ContractResult<()> {
+    // should be ge 0
+    if base_bet.amount.u128() == 0 {
+        Err(StdError::generic_err(
+            ContractError::BaseBetCanNotBeZero {}.to_string(),
         ))
     } else {
         Ok(())

@@ -46,15 +46,15 @@ then
   secretd keys add d
 
   secretd add-genesis-account $ADMIN_ADDR 20000000000000000000000000uscrt
-  secretd add-genesis-account $PLAYER1_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER2_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER3_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER4_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER5_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER6_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER7_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER8_ADDR 2000000uscrt
-  secretd add-genesis-account $PLAYER9_ADDR 2000000uscrt
+  secretd add-genesis-account $PLAYER1_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER2_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER3_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER4_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER5_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER6_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER7_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER8_ADDR 200000000uscrt
+  secretd add-genesis-account $PLAYER9_ADDR 200000000uscrt
   secretd add-genesis-account $PLAYER10_ADDR 2000000uscrt
   secretd add-genesis-account "$(secretd keys show -a a)" 1000000000000000000uscrt
   secretd add-genesis-account "$(secretd keys show -a b)" 1000000000000000000uscrt

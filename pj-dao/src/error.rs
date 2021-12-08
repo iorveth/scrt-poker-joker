@@ -24,4 +24,14 @@ pub enum ContractError {
     QueryPlayerNotValid {},
     #[error("NotEnoughXpForTheBaseBet")]
     NotEnoughXpForTheBaseBet {},
+    #[error("AlreadyHasNFTContract")]
+    AlreadyHasNFTContract {},
+    #[error("NotAdmin")]
+    NotAdmin {},
+    #[error("GameIsNotFinsihed")]
+    GameIsNotFinsihed {},
+    #[error("NotAPlayer")]
+    NotAPlayer {},
+    #[error("BaseBetCanNotBeZero")]
+    BaseBetCanNotBeZero {},
 }
