@@ -389,13 +389,13 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
     // ensure game is finished and can be ended
     game_details.ensure_is_finished()?;
 
-    // ensure given address is player address
-    game_details.ensure_is_player_address(env.message.sender)?;
-
-    let game_json = Json::serialize(&Game::from(game_details.clone()))?;
-
     // determine a winner and complete payments
     let winner = game_details.determine_a_winner();
+
+    // ensure given address can complete a game
+    game_details.ensure_can_complete_a_game(env.message.sender, winner)?;
+
+    let game_json = Json::serialize(&Game::from(game_details.clone()))?;
 
     // we need to increase nft xp if there is a winner
     let set_metadata_msg = if let Some(winner) = winner {

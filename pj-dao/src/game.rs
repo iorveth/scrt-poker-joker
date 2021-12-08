@@ -427,8 +427,21 @@ impl GameDetails {
     }
 
     // Ensure provided address is player address
-    pub fn ensure_is_player_address(&self, address: HumanAddr) -> ContractResult<()> {
-        if address == self.game.host_player_address || address == self.game.joined_player_address {
+    pub fn ensure_can_complete_a_game(
+        &self,
+        address: HumanAddr,
+        winner: Option<Player>,
+    ) -> ContractResult<()> {
+        let can_complete_a_game = match winner {
+            Some(Player::Host) => address == self.game.host_player_address,
+            Some(Player::Joined) => address == self.game.joined_player_address,
+            _ => {
+                address == self.game.host_player_address
+                    || address == self.game.joined_player_address
+            }
+        };
+
+        if can_complete_a_game {
             Ok(())
         } else {
             Err(StdError::generic_err(
