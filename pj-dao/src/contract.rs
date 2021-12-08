@@ -515,7 +515,7 @@ fn query_nft_info_by_id<S: Storage, A: Api, Q: Querier>(
         /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
         callback_code_hash: nft_code_hash(&deps.storage)?,
         /// msg is the json-encoded QueryMsg struct
-        msg: to_binary(&NftQueryMsg::NftInfo { token_id: token_id })?,
+        msg: to_binary(&NftQueryMsg::NftInfo { token_id })?,
     }))
 }
 
@@ -582,9 +582,7 @@ pub fn ensure_is_not_a_dao_member<S: Storage>(
 ) -> ContractResult<()> {
     load_joiner(storage, player_raw)?
         .map(|_| ())
-        .ok_or(StdError::generic_err(
-            ContractError::AlreadyJoinedDao {}.to_string(),
-        ))
+        .ok_or_else(|| StdError::generic_err(ContractError::AlreadyJoinedDao {}.to_string()))
 }
 
 /// Ensure provided NFT is in a set of NFTs
@@ -608,11 +606,7 @@ pub fn ensure_can_use_nft_in_a_game<S: Storage, A: Api, Q: Querier>(
     base_bet: &Coin,
 ) -> ContractResult<()> {
     let nft_info = query_nft_info_by_id(deps, token_id)?;
-    if let NftQueryAnswer::NftInfo {
-        token_uri,
-        extension,
-    } = nft_info
-    {
+    if let NftQueryAnswer::NftInfo { extension, .. } = nft_info {
         if let Some(extension) = extension {
             extension.ensure_enough_xp_for_the_base_bet(base_bet)
         } else {
@@ -657,11 +651,7 @@ fn get_set_nft_metadata_msg<S: Storage, A: Api, Q: Querier>(
 
     let winner_nft_metadata = query_nft_info_by_id(deps, token_id.clone())?;
 
-    let new_ext = if let NftQueryAnswer::NftInfo {
-        token_uri,
-        extension,
-    } = winner_nft_metadata
-    {
+    let new_ext = if let NftQueryAnswer::NftInfo { extension, .. } = winner_nft_metadata {
         if let Some(mut ext) = extension {
             ext.xp += 5;
             ext
