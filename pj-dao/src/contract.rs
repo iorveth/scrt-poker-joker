@@ -165,7 +165,7 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
         })
     } else {
         Err(StdError::generic_err(
-            ContractError::AlreadyJoined {}.to_string(),
+            ContractError::AlreadyJoinedDao {}.to_string(),
         ))
     }
 }
@@ -250,9 +250,10 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     base_bet: Coin,
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
-    // check whether nft supports base bet
+    // Ensure given account joined dao, retrieve it's viewing key.
+    let nft_viewing_key = ensure_is_dao_member(deps, &env.message.sender)?;
 
-    // check whether dao member
+    // check whether nft supports base_bet
 
     // ensure base bet is greater then zero
     ensure_correct_base_bet(&base_bet)?;
@@ -286,9 +287,8 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     game_id: GameId,
     secret: Secret,
 ) -> ContractResult<HandleResponse> {
-    // check whether nft supports base_bet
-
-    // check whether dao member
+    // Ensure given account joined dao, retrieve it's viewing key.
+    let nft_viewing_key = ensure_is_dao_member(deps, &env.message.sender)?;
 
     // ensure game exists
     let mut game_details = load_game(&deps.storage, game_id)?;
@@ -531,39 +531,35 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     player: HumanAddr,
     viewer: HumanAddr,
 ) -> StdResult<Vec<String>> {
-    let player_raw = deps.api.canonical_address(&player)?;
-    if let Some(viewing_key) = load_joiner(&deps.storage, &player_raw)? {
-        let query = NftQueryMsg::Tokens {
-            owner: player,
-            /// optional address of the querier if different from the owner
-            viewer: Some(viewer),
-            /// optional viewing key
-            viewing_key: Some(viewing_key),
-            /// paginate by providing the last token_id received in the previous query
-            start_after: None,
-            /// optional number of token ids to display
-            limit: None,
-        };
+    // Ensure given account joined dao, retrieve it's viewing key.
+    let viewing_key = ensure_is_dao_member(deps, &player)?;
 
-        let tokens: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: nft_address(&deps.storage)?,
-            /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
-            /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
-            callback_code_hash: nft_code_hash(&deps.storage)?,
-            /// msg is the json-encoded QueryMsg struct
-            msg: to_binary(&query)?,
-        }))?;
+    let query = NftQueryMsg::Tokens {
+        owner: player,
+        /// optional address of the querier if different from the owner
+        viewer: Some(viewer),
+        /// optional viewing key
+        viewing_key: Some(viewing_key),
+        /// paginate by providing the last token_id received in the previous query
+        start_after: None,
+        /// optional number of token ids to display
+        limit: None,
+    };
 
-        match tokens {
-            NftQueryAnswer::TokenList { tokens: list } => Ok(list),
-            _ => Err(StdError::generic_err(
-                ContractError::QueryPlayerNotValid {}.to_string(),
-            )),
-        }
-    } else {
-        Err(StdError::generic_err(
+    let tokens: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+        contract_addr: nft_address(&deps.storage)?,
+        /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
+        /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
+        callback_code_hash: nft_code_hash(&deps.storage)?,
+        /// msg is the json-encoded QueryMsg struct
+        msg: to_binary(&query)?,
+    }))?;
+
+    match tokens {
+        NftQueryAnswer::TokenList { tokens: list } => Ok(list),
+        _ => Err(StdError::generic_err(
             ContractError::QueryPlayerNotValid {}.to_string(),
-        ))
+        )),
     }
 }
 
@@ -602,5 +598,22 @@ pub fn ensure_correct_base_bet(base_bet: &Coin) -> ContractResult<()> {
         ))
     } else {
         Ok(())
+    }
+}
+
+/// Ensure given player joined DAO
+pub fn ensure_is_dao_member<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    player: &HumanAddr,
+) -> ContractResult<String> {
+    // check whether nft supports base bet
+    let player_raw = deps.api.canonical_address(player)?;
+
+    if let Some(player) = load_joiner(&deps.storage, &player_raw)? {
+        Ok(player)
+    } else {
+        Err(StdError::generic_err(
+            ContractError::DidNotJoinDao {}.to_string(),
+        ))
     }
 }
