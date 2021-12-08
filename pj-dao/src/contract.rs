@@ -10,9 +10,9 @@ use crate::state::{
     save_nft_address, save_nft_code_hash, save_nft_code_id,
 };
 use cosmwasm_std::{
-    has_coins, log, to_binary, Api, Binary, Coin, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, QueryRequest, StdError, StdResult, Storage, WasmMsg,
-    WasmQuery,
+    has_coins, log, to_binary, Api, Binary, CanonicalAddr, Coin, CosmosMsg, Env, Extern,
+    HandleResponse, HumanAddr, InitResponse, Querier, QueryRequest, StdError, StdResult, Storage,
+    WasmMsg, WasmQuery,
 };
 use secret_toolkit::serialization::{Json, Serde};
 
@@ -57,7 +57,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         } => join_game(deps, env, nft_id, game_id, secret),
         HandleMsg::Roll { game_id } => roll(deps, env, game_id),
         HandleMsg::ReRoll { game_id, dices } => reroll(deps, env, game_id, dices),
-        HandleMsg::AdminMint { to, private_metadata } => admin_mint(deps, env, to, private_metadata),
+        HandleMsg::AdminMint {
+            to,
+            private_metadata,
+        } => admin_mint(deps, env, to, private_metadata),
         HandleMsg::EndGame { game_id } => end_game(deps, env, game_id),
     }
 }
@@ -98,71 +101,69 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     env: Env,
     nft: Option<JoinNftDetails>,
 ) -> ContractResult<HandleResponse> {
+    // check whether nft supports base bet
+    let player_raw = deps.api.canonical_address(&env.message.sender)?;
+
+    // Ensure user is not a dao member yet
+    ensure_is_not_a_dao_member(&deps.storage, &player_raw)?;
+
     // TODO: charge user?
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let is_joined = load_joiner(&deps.storage, &sender_raw)?;
 
-    if is_joined == None {
-        let mut response_msg: Vec<CosmosMsg> = vec![];
+    let mut response_msg: Vec<CosmosMsg> = vec![];
 
-        // if a nft_id is provided, we check if msg.sender owns the nft
-        // in order to check, dao must be provided the viewing key, at least this once
-        if let Some(nft) = nft {
-            let query = WasmQuery::Smart {
-                contract_addr: nft_address(&deps.storage)?,
-                callback_code_hash: nft_code_hash(&deps.storage)?,
-                msg: to_binary(&NftQueryMsg::OwnerOf {
-                    token_id: nft.id,
-                    viewer: Some(ViewerInfo {
-                        address: env.message.sender.clone(),
-                        viewing_key: nft.viewing_key.clone(),
-                    }),
-                    include_expired: None,
-                })?,
-            };
-            let result: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(query))?;
-            let returned_owner = match result {
-                NftQueryAnswer::OwnerOf {
-                    owner,
-                    approvals: _,
-                } => owner,
-                _ => return Err(StdError::generic_err("Error parsing query results")),
-            };
+    // if a nft_id is provided, we check if msg.sender owns the nft
+    // in order to check, dao must be provided the viewing key, at least this once
+    if let Some(nft) = nft {
+        let query = WasmQuery::Smart {
+            contract_addr: nft_address(&deps.storage)?,
+            callback_code_hash: nft_code_hash(&deps.storage)?,
+            msg: to_binary(&NftQueryMsg::OwnerOf {
+                token_id: nft.id,
+                viewer: Some(ViewerInfo {
+                    address: env.message.sender.clone(),
+                    viewing_key: nft.viewing_key.clone(),
+                }),
+                include_expired: None,
+            })?,
+        };
+        let result: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(query))?;
+        let returned_owner = match result {
+            NftQueryAnswer::OwnerOf {
+                owner,
+                approvals: _,
+            } => owner,
+            _ => return Err(StdError::generic_err("Error parsing query results")),
+        };
 
-            if env.message.sender != returned_owner {
-                return Err(StdError::generic_err(
-                    "Not authorised to join with this nft",
-                ));
-            }
-            save_joiner(&mut deps.storage, &sender_raw, nft.viewing_key)?;
-        } else {
-            // we will mint a new nft for the owner
-            let (msg, viewing_key) =
-                mint_dice_nft_handle_msg(&env.message.sender, env.block.time, None);
-
-            // save the new joiner's viewing key
-            save_joiner(&mut deps.storage, &sender_raw, viewing_key)?;
-
-            let contract_addr = nft_address(&deps.storage)?;
-            let callback_code_hash = nft_code_hash(&deps.storage)?;
-            let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr,
-                callback_code_hash,
-                msg: to_binary(&msg)?,
-                send: vec![],
-            });
-            response_msg.push(mint_msg);
+        if env.message.sender != returned_owner {
+            return Err(StdError::generic_err(
+                "Not authorised to join with this nft",
+            ));
         }
-        Ok(HandleResponse {
-            messages: response_msg,
-            log: vec![log("member joined dao", env.message.sender)],
-            data: None,
-        })
+        save_joiner(&mut deps.storage, &player_raw, nft.viewing_key)?;
     } else {
-        Err(StdError::generic_err(
-            ContractError::AlreadyJoinedDao {}.to_string(),
-        ))
+        // we will mint a new nft for the owner
+        let (msg, viewing_key) =
+            mint_dice_nft_handle_msg(&env.message.sender, env.block.time, None);
+
+        // save the new joiner's viewing key
+        save_joiner(&mut deps.storage, &player_raw, viewing_key)?;
+
+        let contract_addr = nft_address(&deps.storage)?;
+        let callback_code_hash = nft_code_hash(&deps.storage)?;
+        let mint_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr,
+            callback_code_hash,
+            msg: to_binary(&msg)?,
+            send: vec![],
+        });
+        response_msg.push(mint_msg);
     }
+    Ok(HandleResponse {
+        messages: response_msg,
+        log: vec![log("member joined dao", env.message.sender)],
+        data: None,
+    })
 }
 
 fn mint_dice_nft_handle_msg(
@@ -526,7 +527,7 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     viewer: &HumanAddr,
 ) -> StdResult<Vec<String>> {
     // Ensure given account joined dao, retrieve it's viewing key.
-    let viewing_key = ensure_is_dao_member(deps, &player)?;
+    let viewing_key = ensure_is_dao_member(deps, player)?;
 
     let query = NftQueryMsg::Tokens {
         owner: player.to_owned(),
@@ -608,6 +609,20 @@ pub fn ensure_is_dao_member<S: Storage, A: Api, Q: Querier>(
     } else {
         Err(StdError::generic_err(
             ContractError::DidNotJoinDao {}.to_string(),
+        ))
+    }
+}
+
+/// Ensure given player is not a DAO member
+pub fn ensure_is_not_a_dao_member<S: Storage>(
+    storage: &S,
+    player_raw: &CanonicalAddr,
+) -> ContractResult<()> {
+    if load_joiner(storage, player_raw)?.is_none() {
+        Ok(())
+    } else {
+        Err(StdError::generic_err(
+            ContractError::AlreadyJoinedDao {}.to_string(),
         ))
     }
 }
