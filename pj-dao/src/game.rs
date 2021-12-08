@@ -426,7 +426,7 @@ impl GameDetails {
         }
     }
 
-    // Ensure provided address is player address
+    // Ensure actor can complete a game
     pub fn ensure_can_complete_a_game(
         &self,
         address: HumanAddr,

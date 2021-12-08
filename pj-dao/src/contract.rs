@@ -392,7 +392,7 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
     // determine a winner and complete payments
     let winner = game_details.determine_a_winner();
 
-    // ensure given address can complete a game
+    // Ensure actor can complete a game
     game_details.ensure_can_complete_a_game(env.message.sender, winner)?;
 
     let game_json = Json::serialize(&Game::from(game_details.clone()))?;
