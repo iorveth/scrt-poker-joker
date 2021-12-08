@@ -101,7 +101,6 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     env: Env,
     nft: Option<JoinNftDetails>,
 ) -> ContractResult<HandleResponse> {
-    // check whether nft supports base bet
     let player_raw = deps.api.canonical_address(&env.message.sender)?;
 
     // Ensure user is not a dao member yet
@@ -164,24 +163,6 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
         log: vec![log("member joined dao", env.message.sender)],
         data: None,
     })
-}
-
-fn mint_dice_nft_handle_msg(
-    mint_to: &HumanAddr,
-    block_time: u64,
-    private_metadata: Option<Metadata>,
-) -> (NftHandleMsg, String) {
-    let viewing_key =
-        String::from_utf8_lossy(&[mint_to.0.as_bytes(), &block_time.to_be_bytes()].concat())
-            .into_owned();
-
-    let mint_dice_msg = NftHandleMsg::MintDiceNft {
-        owner: mint_to.to_owned(),
-        key: viewing_key.clone(),
-        private_metadata,
-    };
-
-    (mint_dice_msg, viewing_key)
 }
 
 pub fn store_nft_contract_addr<S: Storage, A: Api, Q: Querier>(
@@ -400,35 +381,23 @@ pub fn end_game<S: Storage, A: Api, Q: Querier>(
             Player::Joined => game_details.game.joined_player_nft_id.clone(),
         };
 
-        let current_winner_metadata: NftQueryAnswer =
-            deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                contract_addr: nft_address(&deps.storage)?,
-                /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
-                /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
-                callback_code_hash: nft_code_hash(&deps.storage)?,
-                /// msg is the json-encoded QueryMsg struct
-                msg: to_binary(&NftQueryMsg::NftInfo {
-                    token_id: token_id.clone(),
-                })?,
-            }))?;
+        let winner_nft_metadata = query_nft_by_id(deps, &token_id)?;
 
-        let new_ext = match current_winner_metadata {
-            NftQueryAnswer::NftInfo {
-                token_uri,
-                extension,
-            } => {
-                if let Some(mut ext) = extension {
-                    ext.xp += 5;
-                    ext
-                } else {
-                    return Err(StdError::generic_err("unable to set metadata with uri"));
-                }
+        let new_ext = if let NftQueryAnswer::NftInfo {
+            token_uri,
+            extension,
+        } = winner_nft_metadata
+        {
+            if let Some(mut ext) = extension {
+                ext.xp += 5;
+                ext
+            } else {
+                return Err(StdError::generic_err("unable to set metadata with uri"));
             }
-            _ => {
-                return Err(StdError::generic_err(
-                    "unable to get metadata from nft contract",
-                ));
-            }
+        } else {
+            return Err(StdError::generic_err(
+                "unable to get metadata from nft contract",
+            ));
         };
 
         let set_metadata_msg = NftHandleMsg::SetMetadata {
@@ -558,6 +527,19 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+/// Query nft by it's id
+fn query_nft_by_id<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, token_id: &str) -> StdResult<NftQueryAnswer> {
+    deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+        contract_addr: nft_address(&deps.storage)?,
+        /// callback_code_hash is the hex encoded hash of the code. This is used by Secret Network to harden against replaying the contract
+        /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
+        callback_code_hash: nft_code_hash(&deps.storage)?,
+        /// msg is the json-encoded QueryMsg struct
+        msg: to_binary(&NftQueryMsg::NftInfo { token_id: token_id.to_owned() })?,
+    }))
+}
+
+/// Ensure given account is contract admin
 fn ensure_is_admin<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     sender: &HumanAddr,
@@ -572,7 +554,7 @@ fn ensure_is_admin<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-// Check whether given player provided max amount of coins, that can potentially be lost in the game
+/// Check whether given player provided max amount of coins, that can potentially be lost in the game
 pub fn ensure_has_coins_for_game(env: &Env, base_bet: &Coin) -> ContractResult<()> {
     // should be at least 10 x base_bet
     if !has_coins(&env.message.sent_funds, &locked_per_player(base_bet)) {
@@ -623,4 +605,23 @@ pub fn ensure_is_not_a_dao_member<S: Storage>(
         .ok_or(StdError::generic_err(
             ContractError::AlreadyJoinedDao {}.to_string(),
         ))
+}
+
+/// Get `MintDiceNft` handle message from the parameters provided
+fn mint_dice_nft_handle_msg(
+    mint_to: &HumanAddr,
+    block_time: u64,
+    private_metadata: Option<Metadata>,
+) -> (NftHandleMsg, String) {
+    let viewing_key =
+        String::from_utf8_lossy(&[mint_to.0.as_bytes(), &block_time.to_be_bytes()].concat())
+            .into_owned();
+
+    let mint_dice_msg = NftHandleMsg::MintDiceNft {
+        owner: mint_to.to_owned(),
+        key: viewing_key.clone(),
+        private_metadata,
+    };
+
+    (mint_dice_msg, viewing_key)
 }
