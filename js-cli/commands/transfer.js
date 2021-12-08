@@ -24,7 +24,6 @@ const transfer = async (to, amount, denom) => {
   );
 
   let r = await client.sendTokens(to, [{amount, denom}]);
-  console.log("send result: ", r);
   const toAccount = await client.getAccount(to)
   console.log('Receiver Account: ', toAccount);
 };

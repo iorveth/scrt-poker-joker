@@ -10,7 +10,15 @@ const {
 const conf = new (require("conf"))();
 const customFees = require("../util.js");
 
-const joinDao = async (player, tokenId, viewingKey) => {
+const initCollateral = async (
+  player,
+  tokenId,
+  priceDenom,
+  priceAmount,
+  replaymentAmount,
+  expiration
+) => {
+  // Set up signing client
   const httpUrl = process.env.SECRET_REST_URL;
   const playerMnemonic = `PLAYER${player}_MNEMONIC`;
   const player1 = process.env[playerMnemonic];
@@ -26,10 +34,24 @@ const joinDao = async (player, tokenId, viewingKey) => {
     customFees
   );
 
-  const daoAddr = conf.get("daoAddr");
-  console.log("dao address: ", daoAddr);
-  const joinDaoMsg = { join_dao: { nft: null } };
-  let r = await player1Client.execute(daoAddr, joinDaoMsg);
-  console.log("joined Dao and mint: ", JSON.stringify(r, null, 4));
+  const nftAddr = conf.get("nftAddr");
+  const priceCoin = { denom: priceDenom, amount: priceAmount };
+  const repaymentCoin = { denom: priceDenom, amount: replaymentAmount };
+  let exp;
+  if (expiration) {
+    exp = { at_height: Number(expiration) };
+  } else {
+    exp = "never";
+  }
+  const initCollateralMsg = {
+    init_collateral: {
+      token_id: tokenId,
+      price: priceCoin,
+      repayment: repaymentCoin,
+      expiration: exp,
+    },
+  };
+  let r = await player1Client.execute(nftAddr, initCollateralMsg);
+  console.log("result: ", JSON.stringify(r, null, 4));
 };
-module.exports = joinDao;
+module.exports = initCollateral;
