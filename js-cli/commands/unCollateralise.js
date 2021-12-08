@@ -1,5 +1,4 @@
 const {
-  CosmWasmClient,
   EnigmaUtils,
   Secp256k1Pen,
   SigningCosmWasmClient,
@@ -10,9 +9,14 @@ const {
 const conf = new (require("conf"))();
 const customFees = require("../util.js");
 
-const joinDao = async (player, tokenId, viewingKey) => {
+const unCollateralise = async (
+  from,
+  tokenId,
+  priceDenom,
+  priceAmount
+) => {
   const httpUrl = process.env.SECRET_REST_URL;
-  const playerMnemonic = `PLAYER${player}_MNEMONIC`;
+  const playerMnemonic = `PLAYER${from}_MNEMONIC`;
   const player1 = process.env[playerMnemonic];
   const signingPen1 = await Secp256k1Pen.fromMnemonic(player1);
   const pubkey1 = encodeSecp256k1Pubkey(signingPen1.pubkey);
@@ -26,10 +30,14 @@ const joinDao = async (player, tokenId, viewingKey) => {
     customFees
   );
 
-  const daoAddr = conf.get("daoAddr");
-  console.log("dao address: ", daoAddr);
-  const joinDaoMsg = { join_dao: { nft: null } };
-  let r = await player1Client.execute(daoAddr, joinDaoMsg);
-  console.log("joined Dao and mint: ", JSON.stringify(r, null, 4));
+  const nftAddr = conf.get("nftAddr");
+  const coin = { denom: priceDenom, amount: priceAmount };
+  const uncollateralMsg = {
+    uncollateralise: {
+      token_id: tokenId,
+    },
+  };
+  let r = await player1Client.execute(nftAddr, uncollateralMsg, "", [coin]);
+  console.log("result: ", JSON.stringify(r, null, 4));
 };
-module.exports = joinDao;
+module.exports = unCollateralise;
