@@ -1,8 +1,8 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, Game, GameDetails, GameStatus, Player, NUM_OF_DICES};
 use crate::msg::{
-    HandleMsg, InitMsg, Metadata, NftHandleMsg, NftInitMsg, NftQueryAnswer, NftQueryMsg,
-    PostInitCallback, QueryMsg, QueryWithPermit,
+    HandleMsg, InitMsg, JoinNftDetails, Metadata, NftHandleMsg, NftInitMsg, NftQueryAnswer,
+    NftQueryMsg, PostInitCallback, QueryMsg, QueryWithPermit,
 };
 use crate::state::{
     load_admin, load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash,
@@ -45,7 +45,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::CreateNftContract {} => create_nft_contract(deps, env),
         HandleMsg::StoreNftContract {} => store_nft_contract_addr(deps, env),
-        HandleMsg::JoinDao { nft_id, permit } => join_dao(deps, env, nft_id, permit),
+        HandleMsg::JoinDao { nft } => join_dao(deps, env, nft),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
@@ -98,8 +98,7 @@ pub fn admin_mint<S: Storage, A: Api, Q: Querier>(
 pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    nft_id: Option<String>,
-    permit: Permit,
+    nft: Option<JoinNftDetails>,
 ) -> ContractResult<HandleResponse> {
     let player_raw = deps.api.canonical_address(&env.message.sender)?;
 
@@ -112,16 +111,16 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
 
     // if a nft_id is provided, we check if msg.sender owns the nft
     // in order to check, dao must be provided the Permit
-    if let Some(nft_id) = nft_id {
+    if let Some(nft) = nft {
         let owner_of_msg = QueryWithPermit::OwnerOf {
-            token_id: nft_id,
+            token_id: nft.nft_id,
             include_expired: None,
         };
 
         let query = WasmQuery::Smart {
             contract_addr: nft_address(&deps.storage)?,
             callback_code_hash: nft_code_hash(&deps.storage)?,
-            msg: to_binary(&to_permit_msg(permit, owner_of_msg))?,
+            msg: to_binary(&to_permit_msg(nft.permit, owner_of_msg))?,
         };
         let result: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(query))?;
         let returned_owner = match result {
@@ -626,13 +625,8 @@ fn mint_dice_nft_handle_msg(
     block_time: u64,
     private_metadata: Option<Metadata>,
 ) -> NftHandleMsg {
-    let viewing_key =
-        String::from_utf8_lossy(&[mint_to.0.as_bytes(), &block_time.to_be_bytes()].concat())
-            .into_owned();
-
     NftHandleMsg::MintDiceNft {
         owner: mint_to.to_owned(),
-        key: viewing_key,
         private_metadata,
     }
 }

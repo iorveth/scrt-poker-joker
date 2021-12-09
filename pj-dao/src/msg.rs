@@ -43,13 +43,19 @@ pub enum HandleMsg {
         game_id: GameId,
     },
     JoinDao {
-        nft_id: Option<String>,
-        permit: Permit,
+        nft: Option<JoinNftDetails>,
     },
     AdminMint {
         to: HumanAddr,
         private_metadata: Option<Metadata>,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct JoinNftDetails {
+    pub nft_id: String,
+    pub permit: Permit,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -174,8 +180,6 @@ pub struct InitConfig {
 pub enum NftHandleMsg {
     MintDiceNft {
         owner: HumanAddr,
-        /// viewing key set by the dao for this dice nft
-        key: String,
         /// optional public metadata that can be seen by everyone
         private_metadata: Option<Metadata>,
     },
