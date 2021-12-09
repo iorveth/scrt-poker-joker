@@ -1,8 +1,8 @@
 use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, Game, GameDetails, GameStatus, Player, NUM_OF_DICES};
 use crate::msg::{
-    HandleMsg, InitMsg, JoinNftDetails, Metadata, NftHandleMsg, NftInitMsg, NftQueryAnswer,
-    NftQueryMsg, PostInitCallback, QueryMsg, QueryWithPermit, ViewerInfo,
+    HandleMsg, InitMsg, Metadata, NftHandleMsg, NftInitMsg, NftQueryAnswer, NftQueryMsg,
+    PostInitCallback, QueryMsg, QueryWithPermit,
 };
 use crate::state::{
     load_admin, load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash,
@@ -14,7 +14,7 @@ use cosmwasm_std::{
     HandleResponse, HumanAddr, InitResponse, Querier, QueryRequest, StdError, StdResult, Storage,
     WasmMsg, WasmQuery,
 };
-use secret_toolkit::permit::{validate, Permit};
+use secret_toolkit::permit::Permit;
 use secret_toolkit::serialization::{Json, Serde};
 
 pub type GameId = u64;
@@ -45,7 +45,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::CreateNftContract {} => create_nft_contract(deps, env),
         HandleMsg::StoreNftContract {} => store_nft_contract_addr(deps, env),
-        HandleMsg::JoinDao { nft, permit } => join_dao(deps, env, nft, permit),
+        HandleMsg::JoinDao { nft_id, permit } => join_dao(deps, env, nft_id, permit),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
@@ -75,13 +75,9 @@ pub fn admin_mint<S: Storage, A: Api, Q: Querier>(
     private_metadata: Option<Metadata>,
 ) -> ContractResult<HandleResponse> {
     ensure_is_admin(deps, &env.message.sender)?;
-    let (msg, viewing_key) = mint_dice_nft_handle_msg(&to, env.block.time, private_metadata);
+    let msg = mint_dice_nft_handle_msg(&to, env.block.time, private_metadata);
 
-    save_joiner(
-        &mut deps.storage,
-        &deps.api.canonical_address(&to)?,
-        viewing_key,
-    )?;
+    save_joiner(&mut deps.storage, &deps.api.canonical_address(&to)?)?;
 
     let contract_addr = nft_address(&deps.storage)?;
     let callback_code_hash = nft_code_hash(&deps.storage)?;
@@ -102,7 +98,7 @@ pub fn admin_mint<S: Storage, A: Api, Q: Querier>(
 pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    nft: Option<JoinNftDetails>,
+    nft_id: Option<String>,
     permit: Permit,
 ) -> ContractResult<HandleResponse> {
     let player_raw = deps.api.canonical_address(&env.message.sender)?;
@@ -115,10 +111,10 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     let mut response_msg: Vec<CosmosMsg> = vec![];
 
     // if a nft_id is provided, we check if msg.sender owns the nft
-    // in order to check, dao must be provided the viewing key, at least this once
-    if let Some(nft) = nft {
+    // in order to check, dao must be provided the Permit
+    if let Some(nft_id) = nft_id {
         let owner_of_msg = QueryWithPermit::OwnerOf {
-            token_id: nft.id,
+            token_id: nft_id,
             include_expired: None,
         };
 
@@ -141,14 +137,13 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
                 "Not authorised to join with this nft",
             ));
         }
-        save_joiner(&mut deps.storage, &player_raw, nft.viewing_key)?;
+        save_joiner(&mut deps.storage, &player_raw)?;
     } else {
         // we will mint a new nft for the owner
-        let (msg, viewing_key) =
-            mint_dice_nft_handle_msg(&env.message.sender, env.block.time, None);
+        let msg = mint_dice_nft_handle_msg(&env.message.sender, env.block.time, None);
 
-        // save the new joiner's viewing key
-        save_joiner(&mut deps.storage, &player_raw, viewing_key)?;
+        // save the new joiner
+        save_joiner(&mut deps.storage, &player_raw)?;
 
         let contract_addr = nft_address(&deps.storage)?;
         let callback_code_hash = nft_code_hash(&deps.storage)?;
@@ -480,8 +475,8 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     player: &HumanAddr,
     permit: Permit,
 ) -> StdResult<Vec<String>> {
-    // Ensure given account joined dao, retrieve it's viewing key.
-    let viewing_key = ensure_is_dao_member(deps, player)?;
+    // Ensure given account joined dao
+    ensure_is_dao_member(deps, player)?;
 
     let permit_query = to_permit_msg(
         permit,
@@ -569,17 +564,12 @@ pub fn ensure_correct_base_bet(base_bet: &Coin) -> ContractResult<()> {
 pub fn ensure_is_dao_member<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     player: &HumanAddr,
-) -> ContractResult<String> {
+) -> ContractResult<()> {
     // check whether nft supports base bet
     let player_raw = deps.api.canonical_address(player)?;
 
-    if let Some(player) = load_joiner(&deps.storage, &player_raw)? {
-        Ok(player)
-    } else {
-        Err(StdError::generic_err(
-            ContractError::DidNotJoinDao {}.to_string(),
-        ))
-    }
+    load_joiner(&deps.storage, &player_raw)
+        .map_err(|_| StdError::generic_err(ContractError::DidNotJoinDao {}.to_string()))
 }
 
 /// Ensure given player is not a DAO member
@@ -587,12 +577,13 @@ pub fn ensure_is_not_a_dao_member<S: Storage>(
     storage: &S,
     player_raw: &CanonicalAddr,
 ) -> ContractResult<()> {
-    if load_joiner(storage, player_raw)?.map(|_| ()).is_some() {
-        return Err(StdError::generic_err(
+    if load_joiner(storage, player_raw).is_ok() {
+        Err(StdError::generic_err(
             ContractError::AlreadyJoinedDao {}.to_string(),
-        ));
+        ))
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 /// Ensure provided NFT is in a set of NFTs
@@ -634,18 +625,16 @@ fn mint_dice_nft_handle_msg(
     mint_to: &HumanAddr,
     block_time: u64,
     private_metadata: Option<Metadata>,
-) -> (NftHandleMsg, String) {
+) -> NftHandleMsg {
     let viewing_key =
         String::from_utf8_lossy(&[mint_to.0.as_bytes(), &block_time.to_be_bytes()].concat())
             .into_owned();
 
-    let mint_dice_msg = NftHandleMsg::MintDiceNft {
+    NftHandleMsg::MintDiceNft {
         owner: mint_to.to_owned(),
-        key: viewing_key.clone(),
+        key: viewing_key,
         private_metadata,
-    };
-
-    (mint_dice_msg, viewing_key)
+    }
 }
 
 /// Get set_nft_metadata_msg from the parameters provided

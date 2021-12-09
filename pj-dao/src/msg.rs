@@ -43,7 +43,7 @@ pub enum HandleMsg {
         game_id: GameId,
     },
     JoinDao {
-        nft: Option<JoinNftDetails>,
+        nft_id: Option<String>,
         permit: Permit,
     },
     AdminMint {
@@ -189,12 +189,6 @@ pub enum NftHandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct JoinNftDetails {
-    pub id: String,
-    pub viewing_key: String,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
@@ -378,12 +372,4 @@ pub enum Expiration {
 pub struct Cw721Approval {
     pub spender: HumanAddr,
     pub expires: Expiration,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ViewerInfo {
-    /// querying address
-    pub address: HumanAddr,
-    /// authentication key string
-    pub viewing_key: String,
 }
