@@ -27,7 +27,8 @@ const adminMint = async (to) => {
   );
 
   const daoAddr = conf.get("daoAddr");
-  const playerAddr = conf.get(`player${to}Addr`);
+  const player = `PLAYER${to}_ADDR`;
+  const playerAddr = process.env[player];
   const admintMintMsg = {
     admin_mint: { to: playerAddr, private_metadata: null },
   };
