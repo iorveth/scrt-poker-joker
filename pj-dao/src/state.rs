@@ -6,6 +6,7 @@ use crate::game::GameDetails;
 
 use cosmwasm_std::{CanonicalAddr, HumanAddr, ReadonlyStorage, StdError, StdResult, Storage};
 
+use secret_toolkit::permit::Permit;
 use secret_toolkit::serialization::{Bincode2, Json, Serde};
 
 pub static CONFIG_KEY: &[u8] = b"config";

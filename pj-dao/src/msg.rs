@@ -23,11 +23,13 @@ pub enum HandleMsg {
         nft_id: String,
         base_bet: Coin,
         secret: Secret,
+        permit: Permit,
     },
     JoinGame {
         nft_id: String,
         game_id: GameId,
         secret: Secret,
+        permit: Permit,
     },
     Roll {
         game_id: GameId,
@@ -41,6 +43,7 @@ pub enum HandleMsg {
     },
     JoinDao {
         nft: Option<JoinNftDetails>,
+        permit: Permit,
     },
     AdminMint {
         to: HumanAddr,

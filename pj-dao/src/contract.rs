@@ -14,6 +14,7 @@ use cosmwasm_std::{
     HandleResponse, HumanAddr, InitResponse, Querier, QueryRequest, StdError, StdResult, Storage,
     WasmMsg, WasmQuery,
 };
+use secret_toolkit::permit::{validate, Permit};
 use secret_toolkit::serialization::{Json, Serde};
 
 pub type GameId = u64;
@@ -44,17 +45,19 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::CreateNftContract {} => create_nft_contract(deps, env),
         HandleMsg::StoreNftContract {} => store_nft_contract_addr(deps, env),
-        HandleMsg::JoinDao { nft } => join_dao(deps, env, nft),
+        HandleMsg::JoinDao { nft, permit } => join_dao(deps, env, nft, permit),
         HandleMsg::CreateNewGameRoom {
             nft_id,
             base_bet,
             secret,
-        } => create_new_game_room(deps, env, nft_id, base_bet, secret),
+            permit,
+        } => create_new_game_room(deps, env, nft_id, base_bet, secret, permit),
         HandleMsg::JoinGame {
             nft_id,
             game_id,
             secret,
-        } => join_game(deps, env, nft_id, game_id, secret),
+            permit,
+        } => join_game(deps, env, nft_id, game_id, secret, permit),
         HandleMsg::Roll { game_id } => roll(deps, env, game_id),
         HandleMsg::ReRoll { game_id, dices } => reroll(deps, env, game_id, dices),
         HandleMsg::AdminMint {
@@ -100,6 +103,7 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     nft: Option<JoinNftDetails>,
+    permit: Permit,
 ) -> ContractResult<HandleResponse> {
     let player_raw = deps.api.canonical_address(&env.message.sender)?;
 
@@ -226,6 +230,7 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     nft_id: String,
     base_bet: Coin,
     secret: Secret,
+    permit: Permit,
 ) -> ContractResult<HandleResponse> {
     // Ensure given account joined dao, retrieve it's nfts.
     let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender)?;
@@ -269,6 +274,7 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     nft_id: String,
     game_id: GameId,
     secret: Secret,
+    permit: Permit,
 ) -> ContractResult<HandleResponse> {
     // Ensure given account joined dao, retrieve it's nfts.
     let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender)?;
