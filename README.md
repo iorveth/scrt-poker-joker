@@ -118,9 +118,11 @@ Added features:
 
 ---
 
-## Ideas to explore
+## Ideas to explore and hackint
 
 - loser loses points
 - make SNIP721 specs into a lib
 
   For more ideas, please see issues created in this repo.
+
+Please go to [hack.md](./hack.md) to set up a local environment.
