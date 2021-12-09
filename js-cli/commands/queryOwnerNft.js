@@ -13,8 +13,9 @@ const queryOwnerNft = async (player) => {
   }
 
   const daoAddr = conf.get("daoAddr");
-  const player1Addr = conf.get(`player${player}Addr`);
-  let queryMsg = { player_nfts: { player: player1Addr, viewer: daoAddr } };
+  const playerAddrStr = `PLAYER${player}_ADDR`;
+  const playerAddr = process.env[playerAddrStr];
+  let queryMsg = { player_nfts: { player: playerAddr, viewer: daoAddr } };
   let player1Nft = await queryClient.queryContractSmart(daoAddr, queryMsg);
 
   console.log("queried  nft ID", JSON.stringify(player1Nft, null, 4));

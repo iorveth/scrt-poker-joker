@@ -580,9 +580,12 @@ pub fn ensure_is_not_a_dao_member<S: Storage>(
     storage: &S,
     player_raw: &CanonicalAddr,
 ) -> ContractResult<()> {
-    load_joiner(storage, player_raw)?
-        .map(|_| ())
-        .ok_or_else(|| StdError::generic_err(ContractError::AlreadyJoinedDao {}.to_string()))
+    if load_joiner(storage, player_raw)?.map(|_| ()).is_some() {
+        return Err(StdError::generic_err(
+            ContractError::AlreadyJoinedDao {}.to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Ensure provided NFT is in a set of NFTs

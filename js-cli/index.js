@@ -25,7 +25,7 @@ program
     .action(joinDao)
 
 program
-    .command('queryrNftOf <player>')
+    .command('queryNftOf <player>')
     .description('queries the owner nft')
     .action(queryOwnerNft)
 
