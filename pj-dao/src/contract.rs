@@ -2,7 +2,7 @@ use crate::error::{ContractError, ContractResult};
 use crate::game::{locked_per_player, Game, GameDetails, GameStatus, Player, NUM_OF_DICES};
 use crate::msg::{
     HandleMsg, InitMsg, JoinNftDetails, Metadata, NftHandleMsg, NftInitMsg, NftQueryAnswer,
-    NftQueryMsg, PostInitCallback, QueryMsg, ViewerInfo,
+    NftQueryMsg, PostInitCallback, QueryMsg, QueryWithPermit, ViewerInfo,
 };
 use crate::state::{
     load_admin, load_game, load_joiner, load_last_game_index, nft_address, nft_code_hash,
@@ -117,17 +117,15 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
     // if a nft_id is provided, we check if msg.sender owns the nft
     // in order to check, dao must be provided the viewing key, at least this once
     if let Some(nft) = nft {
+        let owner_of_msg = QueryWithPermit::OwnerOf {
+            token_id: nft.id,
+            include_expired: None,
+        };
+
         let query = WasmQuery::Smart {
             contract_addr: nft_address(&deps.storage)?,
             callback_code_hash: nft_code_hash(&deps.storage)?,
-            msg: to_binary(&NftQueryMsg::OwnerOf {
-                token_id: nft.id,
-                viewer: Some(ViewerInfo {
-                    address: env.message.sender.clone(),
-                    viewing_key: nft.viewing_key.clone(),
-                }),
-                include_expired: None,
-            })?,
+            msg: to_binary(&to_permit_msg(permit, owner_of_msg))?,
         };
         let result: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(query))?;
         let returned_owner = match result {
@@ -233,7 +231,7 @@ pub fn create_new_game_room<S: Storage, A: Api, Q: Querier>(
     permit: Permit,
 ) -> ContractResult<HandleResponse> {
     // Ensure given account joined dao, retrieve it's nfts.
-    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender)?;
+    let player_nfts = query_player_nfts(deps, &env.message.sender, permit)?;
 
     // Ensure given nft belongs to player
     ensure_can_access_nft(player_nfts, &nft_id)?;
@@ -277,7 +275,7 @@ pub fn join_game<S: Storage, A: Api, Q: Querier>(
     permit: Permit,
 ) -> ContractResult<HandleResponse> {
     // Ensure given account joined dao, retrieve it's nfts.
-    let player_nfts = query_player_nfts(deps, &env.message.sender, &env.message.sender)?;
+    let player_nfts = query_player_nfts(deps, &env.message.sender, permit)?;
 
     // Ensure given nft belongs to player
     ensure_can_access_nft(player_nfts, &nft_id)?;
@@ -430,8 +428,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::Game { game_id } => to_binary(&query_game(deps, game_id)?),
         QueryMsg::GamesByStatus { status } => to_binary(&query_games_by_status(deps, status)?),
         QueryMsg::NftAddress {} => to_binary(&query_nft_address(deps)?),
-        QueryMsg::PlayerNfts { player, viewer } => {
-            to_binary(&query_player_nfts(deps, &player, &viewer)?)
+        QueryMsg::PlayerNfts { player, permit } => {
+            to_binary(&query_player_nfts(deps, &player, permit)?)
         }
         QueryMsg::NftInfo { token_id } => to_binary(&query_nft_info_by_id(deps, token_id)?),
     }
@@ -472,26 +470,29 @@ fn query_games_by_status<S: Storage, A: Api, Q: Querier>(
         .collect()
 }
 
+pub fn to_permit_msg(permit: Permit, query: QueryWithPermit) -> NftQueryMsg {
+    NftQueryMsg::WithPermit { permit, query }
+}
+
 /// Query all the player nfts by the provided viewer key
 fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     player: &HumanAddr,
-    viewer: &HumanAddr,
+    permit: Permit,
 ) -> StdResult<Vec<String>> {
     // Ensure given account joined dao, retrieve it's viewing key.
     let viewing_key = ensure_is_dao_member(deps, player)?;
 
-    let query = NftQueryMsg::Tokens {
-        owner: player.to_owned(),
-        /// optional address of the querier if different from the owner
-        viewer: Some(viewer.to_owned()),
-        /// optional viewing key
-        viewing_key: Some(viewing_key),
-        /// paginate by providing the last token_id received in the previous query
-        start_after: None,
-        /// optional number of token ids to display
-        limit: None,
-    };
+    let permit_query = to_permit_msg(
+        permit,
+        QueryWithPermit::Tokens {
+            owner: player.to_owned(),
+            /// paginate by providing the last token_id received in the previous query
+            start_after: None,
+            /// optional number of token ids to display
+            limit: None,
+        },
+    );
 
     let tokens: NftQueryAnswer = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
         contract_addr: nft_address(&deps.storage)?,
@@ -499,7 +500,7 @@ fn query_player_nfts<S: Storage, A: Api, Q: Querier>(
         /// It is used to bind the request to a destination contract in a stronger way than just the contract address which can be faked
         callback_code_hash: nft_code_hash(&deps.storage)?,
         /// msg is the json-encoded QueryMsg struct
-        msg: to_binary(&query)?,
+        msg: to_binary(&permit_query)?,
     }))?;
 
     match tokens {

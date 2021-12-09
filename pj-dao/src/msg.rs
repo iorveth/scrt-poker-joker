@@ -7,6 +7,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::contract::{GameId, Secret};
+use secret_toolkit::permit::Permit;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
@@ -55,24 +56,15 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     // retrieve all games by status provided
-    GamesByStatus {
-        status: GameStatus,
-    },
+    GamesByStatus { status: GameStatus },
     // get game under specified id
-    Game {
-        game_id: GameId,
-    },
+    Game { game_id: GameId },
     // NFT address
     NftAddress {},
     // retrieve Nfts from player
-    PlayerNfts {
-        player: HumanAddr,
-        viewer: HumanAddr,
-    },
+    PlayerNfts { player: HumanAddr, permit: Permit },
     // retrieve nft info by it's token_id
-    NftInfo {
-        token_id: String,
-    },
+    NftInfo { token_id: String },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
@@ -224,30 +216,37 @@ pub enum NftQueryAnswer {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NftQueryMsg {
+    /// displays the public metadata of a token
+    NftInfo { token_id: String },
+    WithPermit {
+        /// permit used to verify querier identity
+        permit: Permit,
+        /// query to perform
+        query: QueryWithPermit,
+    },
+}
+
+/// queries using permits instead of viewing keys
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryWithPermit {
     OwnerOf {
         token_id: String,
-        /// optional address and key requesting to view the token owner
-        viewer: Option<ViewerInfo>,
         /// optionally include expired Approvals in the response list.  If ommitted or
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
-    /// displays the public metadata of a token
-    NftInfo { token_id: String },
-    /// displays a list of all the tokens belonging to the input owner in which the viewer
-    /// has view_owner permission
+    /// displays a list of all the tokens belonging to the input owner in which the permit
+    /// creator has view_owner permission
     Tokens {
         owner: HumanAddr,
-        /// optional address of the querier if different from the owner
-        viewer: Option<HumanAddr>,
-        /// optional viewing key
-        viewing_key: Option<String>,
         /// paginate by providing the last token_id received in the previous query
         start_after: Option<String>,
         /// optional number of token ids to display
         limit: Option<u32>,
     },
 }
+
 // ----- From NFT contract, todo move to lib ------
 /// info needed to perform a callback message after instantiation
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
