@@ -29,10 +29,6 @@ we realised that our design of the smart contracts was guided by a few principle
 
 [feegrant]: https://github.com/cosmos/cosmos-sdk/blob/v0.44.5/CHANGELOG.md#v0430---2021-08-10
 
-### Message flow diagram (MVP)
-
-TODO
-
 ---
 
 ## Game
@@ -124,7 +120,7 @@ Added features:
 
 ## Ideas to explore
 
-For more ideas, please ee
-
 - loser loses points
 - make SNIP721 specs into a lib
+
+  For more ideas, please see issues created in this repo.
