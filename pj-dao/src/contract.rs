@@ -75,7 +75,7 @@ pub fn admin_mint<S: Storage, A: Api, Q: Querier>(
     private_metadata: Option<Metadata>,
 ) -> ContractResult<HandleResponse> {
     ensure_is_admin(deps, &env.message.sender)?;
-    let msg = mint_dice_nft_handle_msg(&to, env.block.time, private_metadata);
+    let msg = mint_dice_nft_handle_msg(&to, private_metadata);
 
     save_joiner(&mut deps.storage, &deps.api.canonical_address(&to)?)?;
 
@@ -139,7 +139,7 @@ pub fn join_dao<S: Storage, A: Api, Q: Querier>(
         save_joiner(&mut deps.storage, &player_raw)?;
     } else {
         // we will mint a new nft for the owner
-        let msg = mint_dice_nft_handle_msg(&env.message.sender, env.block.time, None);
+        let msg = mint_dice_nft_handle_msg(&env.message.sender, None);
 
         // save the new joiner
         save_joiner(&mut deps.storage, &player_raw)?;
@@ -622,7 +622,6 @@ pub fn ensure_can_use_nft_in_a_game<S: Storage, A: Api, Q: Querier>(
 /// Get `MintDiceNft` handle message from the parameters provided
 fn mint_dice_nft_handle_msg(
     mint_to: &HumanAddr,
-    block_time: u64,
     private_metadata: Option<Metadata>,
 ) -> NftHandleMsg {
     NftHandleMsg::MintDiceNft {

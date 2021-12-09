@@ -8,19 +8,13 @@ Poker Joker DAO is a gaming DAO designed to manage games that provide ownership 
 
 The current version is build for Hackatom VI.
 
-In this version, the game that is support is a multiplayer dice game implemented on the Secret Network.
+In this version, we only support 1 game amd it is a multiplayer dice game implemented on the Secret Network.
 The Secret Network allows for onchain randomness and privacy features that are unique to make this game possible.
-The players of the game roll their own sets of dice, which are represented by Secret NFTs (SNIP-721).
-The owner of the dice NFT, depending on the attributes of the NFT, may have different privilledges in the game.
-
-This is inspired by a mini game in the [Sea Dogs] game series.
-It is similar, yet more simple than Poker dice.
-
-[sea dogs]: https://www.gamepressure.com/games/sea-dogs-to-each-his-own/ze52a6
 
 ## Design guidelines
 
-We strive for the Poker Joker Dice game to be fun and simple, however, our design of the smart contracts was guided by a few principles that we value:
+We started off with wanting something fun and simple, and as we worked on the hackathon,
+we realised that our design of the smart contracts was guided by a few principles that we value:
 
 1. _Aligning NFT value with utility_: By linking the dice NFTs `xp` level (earned by playing) to the `base bet` amount,
    we providing a correlation between the NFT itself and the potential winnings (via [xp-table]) of an NFT in the game.
@@ -35,11 +29,25 @@ We strive for the Poker Joker Dice game to be fun and simple, however, our desig
 
 [feegrant]: https://github.com/cosmos/cosmos-sdk/blob/v0.44.5/CHANGELOG.md#v0430---2021-08-10
 
-### Message flow diagram
+### Message flow diagram (MVP)
+
+TODO
 
 ---
 
-## Poker Joker Dice Game Rules
+## Game
+
+Current this PJ DAO only supports 1 dice game played by nfts from 1 contract.
+
+## Dice Game Rules
+
+The players of the game roll their own sets of dice, which are represented by Secret NFTs (SNIP-721).
+The owner of the dice NFT, depending on the attributes of the NFT, may have different privilledges in the game.
+
+This is inspired by a mini game in the [Sea Dogs] game series.
+It is similar, yet more simple than Poker dice.
+
+[sea dogs]: https://www.gamepressure.com/games/sea-dogs-to-each-his-own/ze52a6
 
 ### Set up
 
@@ -97,12 +105,26 @@ In order to align the value of the Dice NFT with their utility, we have initiall
 | 20 < 40 |   4 Scrt |                     Yes |
 |    40 + |   8 Scrt |                     Yes |
 
-## DAO-like voting (TBC)
+---
 
-With the Dice NFT, owners can take part in the governance of the game.
+## Dice NFT
+
+It is a fork of the SNIP-721 Reference Implementation
+
+Added features:
+
+- Collateralisation (can be used with the js-cli)
+  - InitCollateral: Done by the owner setting the price, repayment price and expiration date
+  - Collateralise: Someone taking this collateral off the market and can transfer it to themselves after expriation date
+  - UnCollateralise: Either the token owner or the collateral holder calls this to make repayment or transfer toke (post expiration)
+- Specific Poker Joker Game metadata (xp and colour generation)
+- on chain randomness generation of some metadata (using entryopy from block time)
+
+---
 
 ## Ideas to explore
 
+For more ideas, please ee
+
 - loser loses points
 - make SNIP721 specs into a lib
-- Viewing key is not specific to the view, this is very much capbility based but we must be able to revoke capability for some view and not others
