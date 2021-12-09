@@ -61,8 +61,8 @@ const deploy = async () => {
   console.log("instantiated dao contract: ", daoAddr);
 
   // looks like instantiate sending fund does not work
-  let r = await signClient.sendTokens(daoAddr, [
-    { amount: String(1_000_000), denom: "uscrt" },
+  await signClient.sendTokens(daoAddr, [
+    { amount: String(1_000_000_000), denom: "uscrt" },
   ]);
   const daoAccount = await signClient.getAccount(daoAddr);
   console.log("daoAccount: ", daoAccount);
@@ -76,7 +76,6 @@ const deploy = async () => {
   try {
     await signClient.execute(daoContract.contractAddress, createContractMsg);
   } catch (e) {
-    console.log("probably already deployed, nvm");
     console.log(e);
   }
 
@@ -87,6 +86,12 @@ const deploy = async () => {
   });
   console.log(`nftAddress: ${nftAddr}`);
   conf.set("nftAddr", nftAddr);
+
+  await signClient.sendTokens(nftAddr, [
+    { amount: String(1_000_000_000), denom: "uscrt" },
+  ]);
+  const nftAccount = await signClient.getAccount(nftAddr);
+  console.log("nftAccount: ", nftAccount);
 
   console.log(
     "Querying nft contract for contract info to ensure address is correct"

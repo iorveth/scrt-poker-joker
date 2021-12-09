@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./poker_joker_logo.png" width="350" alt"logo"  title="hover text">
+</p>
+
 # Poker Joker DAO
 
 Poker Joker DAO is a gaming DAO designed to manage games that provide ownership to players (DAO membership) and utilities for gaming assets (NFTs).
