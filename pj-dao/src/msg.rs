@@ -310,10 +310,10 @@ impl Extension {
         let base_bet_amount = base_bet.amount.u128();
 
         let enough_xp = match self.xp {
-            0..=10 => base_bet_amount == 1,
-            11..=20 => base_bet_amount <= 2,
-            21..=40 => base_bet_amount <= 4,
-            _ => base_bet_amount <= 8,
+            0..=10 => base_bet_amount == 1_000_000,
+            11..=20 => base_bet_amount <= 2_000_000,
+            21..=40 => base_bet_amount <= 4_000_000,
+            _ => base_bet_amount <= 8_000_000,
         };
 
         if !enough_xp {
