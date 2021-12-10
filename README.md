@@ -11,6 +11,8 @@ The current version is build for Hackatom VI.
 In this version, we only support 1 game amd it is a multiplayer dice game implemented on the Secret Network.
 The Secret Network allows for onchain randomness and privacy features that are unique to make this game possible.
 
+You can find us on https://discord.gg/wBmaCTdg
+
 ## Design guidelines
 
 We started off with wanting something fun and simple, and as we worked on the hackathon,
