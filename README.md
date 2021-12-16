@@ -11,6 +11,9 @@ The current version is build for Hackatom VI.
 In this version, we only support 1 game amd it is a multiplayer dice game implemented on the Secret Network.
 The Secret Network allows for onchain randomness and privacy features that are unique to make this game possible.
 
+Application instance, hosted on on public testnet http://pjdao.club/#/main                                         
+Game play demo https://drive.google.com/file/d/1dNX8oXwszDaA7_7TaWNagxXQgz19WLP0/view                                                         
+
 You can find us on https://discord.gg/wBmaCTdg
 
 ## Design guidelines
